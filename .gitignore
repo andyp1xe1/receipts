@@ -8,3 +8,5 @@ skills-lock.json
 dist/
 coverage/
 research/mev-python/tests/private/
+__pycache__/
+*.pyc
