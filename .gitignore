@@ -1,0 +1,10 @@
+node_modules/
+.svelte-kit/
+.wrangler/
+.claude/
+.junie/
+skills-lock.json
+.DS_Store
+dist/
+coverage/
+research/mev-python/tests/private/
