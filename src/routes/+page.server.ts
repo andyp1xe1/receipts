@@ -7,6 +7,7 @@ import {
   listReceipts
 } from '$lib/server/db';
 import { fetchAndParseReceipt } from '$lib/server/mev';
+import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 
 export const load: PageServerLoad = async ({ platform, url }) => {
   const month = url.searchParams.get('month');
@@ -31,18 +32,25 @@ export const actions: Actions = {
     const sourceUrl = String(formData.get('source_url') ?? '').trim();
     const category = String(formData.get('category') ?? '').trim() || null;
     const note = String(formData.get('note') ?? '').trim() || null;
+    const values = {
+      source_url: sourceUrl,
+      category: category ?? '',
+      note: note ?? ''
+    };
+    const normalizedSourceUrl = normalizeReceiptSource(sourceUrl);
 
-    if (!sourceUrl.startsWith('http')) {
+    if (!normalizedSourceUrl) {
       return fail(400, {
         type: 'error',
-        message: 'Paste a full MEV receipt URL.'
+        message: 'Paste or scan a full MEV receipt URL.',
+        values
       });
     }
 
     let destination: string | null = null;
 
     try {
-      const parsed = await fetchAndParseReceipt(sourceUrl);
+      const parsed = await fetchAndParseReceipt(normalizedSourceUrl);
       const existing = await getExistingReceiptByCanonicalKey(platform, parsed);
       if (existing) {
         destination = `/receipts/${existing.id}?duplicate=1`;
@@ -53,7 +61,8 @@ export const actions: Actions = {
     } catch (error) {
       return fail(400, {
         type: 'error',
-        message: error instanceof Error ? error.message : 'Receipt import failed.'
+        message: error instanceof Error ? error.message : 'Receipt import failed.',
+        values
       });
     }
 

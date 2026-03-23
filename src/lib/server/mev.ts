@@ -10,6 +10,15 @@ const numberPattern = /(\d+)$/;
 const fullNumberPattern = /^\d+$/;
 const fourPartUrlPattern = /https:\/\/[^/]+\/(?:receipt|receipt-verifier)\/(?<ecc>[^/]+)\/(?<total>[^/]+)\/(?<receipt>[^/]+)\/(?<date>\d{4}-\d{2}-\d{2})\/?$/;
 
+const browserLikeHeaders = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9,ro;q=0.8',
+  'cache-control': 'no-cache',
+  pragma: 'no-cache'
+} as const;
+
 function asciiNormalize(value: string): string {
   return value
     .replaceAll('№', 'Nr')
@@ -398,19 +407,51 @@ export function parseReceiptText(textOrHtml: string, sourceUrl: string): ParsedR
 }
 
 export async function fetchReceiptHtml(url: string, init?: RequestInit): Promise<string> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      'user-agent': 'Mozilla/5.0 receipts-app/1.0',
-      ...(init?.headers ?? {})
-    }
-  });
+  let lastStatus: number | null = null;
 
-  if (!response.ok) {
-    throw new Error(`Receipt fetch failed with ${response.status}`);
+  for (const candidateUrl of receiptFetchCandidates(url)) {
+    const response = await fetch(candidateUrl, {
+      ...init,
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        ...browserLikeHeaders,
+        ...(init?.headers ?? {}),
+        referer: new URL(candidateUrl).origin + '/'
+      }
+    });
+
+    if (response.ok) {
+      return response.text();
+    }
+
+    lastStatus = response.status;
+    if (![401, 403, 404].includes(response.status)) {
+      break;
+    }
   }
 
-  return response.text();
+  throw new Error(`Receipt fetch failed with ${lastStatus ?? 'unknown status'}`);
+}
+
+function receiptFetchCandidates(sourceUrl: string): string[] {
+  const candidates = new Set([sourceUrl]);
+
+  try {
+    const url = new URL(sourceUrl);
+    const segments = url.pathname.split('/').filter(Boolean);
+    if (url.hostname === 'sift-mev.sfs.md' && segments[0] === 'receipt' && segments.length >= 2) {
+      candidates.add(`https://mev.sfs.md/receipt-verifier/${segments.slice(1).join('/')}`);
+    }
+
+    if (url.hostname === 'mev.sfs.md' && segments[0] === 'receipt-verifier' && segments.length >= 2) {
+      candidates.add(`https://sift-mev.sfs.md/receipt/${segments.slice(1).join('/')}`);
+    }
+  } catch {
+    return [...candidates];
+  }
+
+  return [...candidates];
 }
 
 export async function fetchAndParseReceipt(sourceUrl: string): Promise<ParsedReceipt> {

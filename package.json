@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "test:mev-live": "vitest run src/lib/server/mev.private.test.ts",
     "db:migrate:local": "wrangler d1 migrations apply receipts-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply receipts-db --remote",
     "deploy": "vite build && wrangler deploy"
@@ -18,11 +19,15 @@
     "@sveltejs/adapter-cloudflare": "^7.1.2",
     "@sveltejs/kit": "^2.39.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@types/node": "^25.5.0",
     "svelte": "^5.39.5",
     "svelte-check": "^4.3.3",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
     "vitest": "^3.2.4",
     "wrangler": "^4.58.0"
+  },
+  "dependencies": {
+    "qr-scanner": "^1.4.2"
   }
 }

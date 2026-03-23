@@ -202,6 +202,10 @@ button {
   gap: 6px;
 }
 
+.field > :global(.scanner-panel) {
+  margin-top: 2px;
+}
+
 .label {
   font-size: 13px;
   font-weight: 500;
@@ -285,6 +289,53 @@ button {
   color: #f0c2bb;
   border-color: rgba(184, 91, 78, 0.4);
   background: rgba(184, 91, 78, 0.12);
+}
+
+.scanner-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.scanner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scanner-status {
+  color: var(--muted);
+}
+
+.scanner-alert {
+  margin: 0;
+}
+
+.scanner-file-input {
+  display: none;
+}
+
+.scanner-frame,
+.scanner-placeholder {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #141210;
+}
+
+.scanner-frame {
+  overflow: hidden;
+}
+
+.scanner-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #0f0d0c;
+}
+
+.scanner-placeholder {
+  padding: 16px;
+  color: var(--muted);
 }
 
 .data-list {

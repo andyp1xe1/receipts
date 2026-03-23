@@ -1,8 +1,14 @@
 <script lang="ts">
+  import QrScanner from '$lib/components/qr-scanner.svelte';
   import { formatCurrency, formatMonthLabel, formatDateTime, slugCategory } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
+  let sourceUrl = $state('');
+  let category = $state('');
+  let note = $state('');
+  let appliedForm = $state<ActionData | null>(null);
+  let sourceInput: HTMLInputElement | null = null;
 
   const maxMonthlyTotal = $derived.by(() =>
     data.stats.monthlySpend.reduce((max, month) => Math.max(max, month.total), 0)
@@ -14,6 +20,19 @@
   const currentMonthTotal = $derived(
     data.stats.monthlySpend.find((month) => month.month === currentMonth)?.total ?? 0
   );
+
+  $effect(() => {
+    if (!form || form === appliedForm) return;
+    sourceUrl = form.values?.source_url ?? '';
+    category = form.values?.category ?? '';
+    note = form.values?.note ?? '';
+    appliedForm = form;
+  });
+
+  function handleScannerResult(value: string) {
+    sourceUrl = value;
+    sourceInput?.focus();
+  }
 </script>
 
 <svelte:head>
@@ -51,6 +70,8 @@
           <label class="field">
             <span class="label">Receipt URL</span>
             <input
+              bind:this={sourceInput}
+              bind:value={sourceUrl}
               class="input"
               type="url"
               name="source_url"
@@ -59,14 +80,25 @@
             />
           </label>
 
+          <div class="field">
+            <span class="label">QR scanner</span>
+            <QrScanner onscan={handleScannerResult} />
+          </div>
+
           <label class="field">
             <span class="label">Category</span>
-            <input class="input" type="text" name="category" placeholder="Groceries" />
+            <input
+              bind:value={category}
+              class="input"
+              type="text"
+              name="category"
+              placeholder="Groceries"
+            />
           </label>
 
           <label class="field">
             <span class="label">Note</span>
-            <textarea class="textarea" name="note" placeholder="Optional note"></textarea>
+            <textarea bind:value={note} class="textarea" name="note" placeholder="Optional note"></textarea>
           </label>
 
           <div class="button-row">

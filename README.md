@@ -20,6 +20,16 @@ bun run test
 bun run dev
 ```
 
+## Private live parser tests
+
+Concrete MEV receipt URLs stay out of git.
+
+- Put a private corpus in `tests/private/receipt_urls.json` or `tests/private/receipt_urls.local.json`
+- Or set `MEV_PRIVATE_RECEIPT_LIST=/absolute/path/to/receipt_urls.json`
+- Use `tests/receipt_urls.example.json` as the shape reference
+
+Run the normal suite with `bun run test` or only the live invariant suite with `bun run test:mev-live`.
+
 ## Production
 
 - app: `https://your-workers-app.workers.dev`
@@ -31,6 +41,4 @@ Deploy with:
 bun run deploy
 ```
 
-## Research archive
-
-The earlier Python parser experiments, live URL tests, and MEV research notes live under `research/mev-python/`.
+The parser and invariants now live entirely in the TypeScript app and Vitest suite.
