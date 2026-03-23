@@ -8,15 +8,12 @@
 
 <svelte:head>
   <title>{receipt.merchant_name} - Receipt Ledger</title>
-  <meta name="description" content={`Receipt detail for ${receipt.merchant_name} on ${receipt.url_date}.`} />
+  <meta name="description" content={`Receipt detail for ${receipt.merchant_name}.`} />
 </svelte:head>
 
 <div class="app-shell">
   <header class="app-header">
-    <div>
-      <h1 class="app-title">Receipt Ledger</h1>
-      <p class="app-subtitle">Receipt detail</p>
-    </div>
+    <h1 class="app-title">Receipt Ledger</h1>
     <div class="header-actions">
       <a class="button-ghost" href="/">Back to ledger</a>
     </div>
@@ -24,20 +21,20 @@
 
   <div class="detail-shell">
     <main class="stack">
+      {#if data.created}
+        <div class="alert compact success">Receipt imported and stored.</div>
+      {/if}
+
+      {#if data.duplicate}
+        <div class="alert compact success">This receipt already existed — opened the saved copy.</div>
+      {/if}
+
+      {#if form?.message}
+        <div class={`alert compact ${form.type === 'error' ? 'error' : 'success'}`}>{form.message}</div>
+      {/if}
+
       <section class="panel">
-        {#if data.created}
-          <div class="alert success">Receipt imported and stored in D1.</div>
-        {/if}
-
-        {#if data.duplicate}
-          <div class="alert success">This receipt already existed, so the saved copy was opened.</div>
-        {/if}
-
-        {#if form?.message}
-          <div class={`alert ${form.type === 'error' ? 'error' : 'success'}`}>{form.message}</div>
-        {/if}
-
-        <div class="panel-body stack">
+        <div class="panel-body">
           <div class="detail-header">
             <div>
               <h2 class="detail-title">{receipt.merchant_name}</h2>
@@ -45,7 +42,6 @@
                 <span>{formatDateTime(receipt.issued_at)}</span>
                 <span>ECC {receipt.ecc_id}</span>
                 <span>Receipt #{receipt.url_receipt_number}</span>
-                <span>{receipt.url_date}</span>
               </div>
             </div>
             <div class="detail-total">{formatCurrency(receipt.total)}</div>
@@ -80,41 +76,72 @@
       </section>
 
       <div class="two-column">
-        <section class="panel">
+        <div class="compact-section">
+          <strong>Taxes</strong>
+          {#if receipt.parsed.taxes.length}
+            {#each receipt.parsed.taxes as tax}
+              <div class="spaced">
+                <span>{tax.label}</span>
+                <strong>{formatCurrency(tax.amount)}</strong>
+              </div>
+            {/each}
+          {:else}
+            <div class="muted">No explicit tax lines.</div>
+          {/if}
+        </div>
+
+        <div class="compact-section">
+          <strong>Payments</strong>
+          {#if receipt.parsed.payments.card !== null}
+            <div class="spaced"><span>Card</span><strong>{formatCurrency(receipt.parsed.payments.card)}</strong></div>
+          {/if}
+          {#if receipt.parsed.payments.cashGiven !== null}
+            <div class="spaced"><span>Cash given</span><strong>{formatCurrency(receipt.parsed.payments.cashGiven)}</strong></div>
+          {/if}
+          {#if receipt.parsed.payments.change !== null}
+            <div class="spaced"><span>Change</span><strong>{formatCurrency(receipt.parsed.payments.change)}</strong></div>
+          {/if}
+          {#each Object.entries(receipt.parsed.payments.other) as [label, amount]}
+            <div class="spaced"><span>{label}</span><strong>{formatCurrency(amount)}</strong></div>
+          {/each}
+        </div>
+      </div>
+
+      <div class="detail-bottom-row">
+        <section class="panel panel-muted">
           <div class="panel-header">
-            <h2 class="panel-title">Taxes</h2>
+            <h3 class="panel-title">Source details</h3>
           </div>
           <div class="panel-body stack" style="gap: 10px;">
-            {#if receipt.parsed.taxes.length}
-              {#each receipt.parsed.taxes as tax}
-                <div class="spaced">
-                  <span>{tax.label}</span>
-                  <strong>{formatCurrency(tax.amount)}</strong>
-                </div>
-              {/each}
-            {:else}
-              <div class="section-note">No explicit tax lines found.</div>
-            {/if}
+            <div class="meta-grid">
+              <div class="meta-label">Source URL</div>
+              <div class="meta-value">{receipt.source_url}</div>
+            </div>
+            <div class="meta-grid">
+              <div class="meta-label">ECC</div>
+              <div class="meta-value">{receipt.ecc_id}</div>
+            </div>
+            <div class="meta-grid">
+              <div class="meta-label">URL total</div>
+              <div class="meta-value">{receipt.url_total}</div>
+            </div>
+            <div class="meta-grid">
+              <div class="meta-label">Receipt number</div>
+              <div class="meta-value">{receipt.url_receipt_number}</div>
+            </div>
+            <div class="meta-grid">
+              <div class="meta-label">Date</div>
+              <div class="meta-value">{receipt.url_date}</div>
+            </div>
           </div>
         </section>
 
         <section class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">Payments</h2>
+            <h3 class="panel-title">Raw receipt</h3>
           </div>
-          <div class="panel-body stack" style="gap: 10px;">
-            {#if receipt.parsed.payments.card !== null}
-              <div class="spaced"><span>Card</span><strong>{formatCurrency(receipt.parsed.payments.card)}</strong></div>
-            {/if}
-            {#if receipt.parsed.payments.cashGiven !== null}
-              <div class="spaced"><span>Cash given</span><strong>{formatCurrency(receipt.parsed.payments.cashGiven)}</strong></div>
-            {/if}
-            {#if receipt.parsed.payments.change !== null}
-              <div class="spaced"><span>Change</span><strong>{formatCurrency(receipt.parsed.payments.change)}</strong></div>
-            {/if}
-            {#each Object.entries(receipt.parsed.payments.other) as [label, amount]}
-              <div class="spaced"><span>{label}</span><strong>{formatCurrency(amount)}</strong></div>
-            {/each}
+          <div class="panel-body">
+            <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
           </div>
         </section>
       </div>
@@ -122,9 +149,6 @@
 
     <aside class="stack">
       <section class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Metadata</h2>
-        </div>
         <form method="POST" action="?/save" class="panel-body stack">
           <label class="field">
             <span class="label">Category</span>
@@ -133,55 +157,16 @@
 
           <label class="field">
             <span class="label">Note</span>
-            <textarea class="textarea" name="note">{receipt.note ?? ''}</textarea>
+            <textarea class="textarea" name="note" value={receipt.note ?? ''}></textarea>
           </label>
 
           <div class="button-row">
             <button class="button" type="submit">Save changes</button>
           </div>
         </form>
-        <div class="panel-body" style="padding-top: 0;">
-          <form method="POST" action="?/delete">
-            <button class="button-secondary" type="submit">Delete receipt</button>
-          </form>
-        </div>
-      </section>
-
-      <section class="panel panel-muted">
-        <div class="panel-header">
-          <h2 class="panel-title">Canonical identity</h2>
-        </div>
-        <div class="panel-body stack" style="gap: 10px;">
-          <div class="meta-grid">
-            <div class="meta-label">Source URL</div>
-            <div class="meta-value">{receipt.source_url}</div>
-          </div>
-          <div class="meta-grid">
-            <div class="meta-label">ECC</div>
-            <div class="meta-value">{receipt.ecc_id}</div>
-          </div>
-          <div class="meta-grid">
-            <div class="meta-label">URL total</div>
-            <div class="meta-value">{receipt.url_total}</div>
-          </div>
-          <div class="meta-grid">
-            <div class="meta-label">Receipt number</div>
-            <div class="meta-value">{receipt.url_receipt_number}</div>
-          </div>
-          <div class="meta-grid">
-            <div class="meta-label">Date</div>
-            <div class="meta-value">{receipt.url_date}</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">ASCII receipt</h2>
-        </div>
-        <div class="panel-body">
-          <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
-        </div>
+        <form method="POST" action="?/delete" class="panel-body" style="padding-top: 0;" onsubmit={(e) => { if (!confirm('Delete this receipt permanently?')) e.preventDefault(); }}>
+          <button class="button-danger" type="submit">Delete</button>
+        </form>
       </section>
     </aside>
   </div>
