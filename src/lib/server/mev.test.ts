@@ -1,23 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { parseReceiptText } from './mev';
 
-const sourceUrl = 'https://example.invalid/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06';
-const opaqueSourceUrl = 'https://example.invalid/receipt/OPAQUE-LOOKUP-TOKEN';
+const sourceUrl = 'https://mev.sfs.md/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06';
+const opaqueSourceUrl = 'https://sift-mev.sfs.md/receipt/FAKE-OPAQUE-TOKEN';
 
 const sampleText = `
 DEMO MARKET SRL
 COD FISCAL: 1234567890123
-mun. Chisinau, str. Studentilor 9/8
+mun. Exemplu, str. Test 1/1
 NUMARUL DE INREGISTRARE: FAKEECC001
 
 Americano
-1.000 x 20.00
-20.00
+1.000 x 91.37
+91.37
 
 TOTAL
-20.00
+91.37
 SUBTOTAL
-20.00
+91.37
 
 TVA _ 0.00%
 0.00
@@ -25,18 +25,18 @@ TVA _ 0.00%
 INTRODUS
 0.00
 CARD
-20.00
+91.37
 REST
 0.00
 
-DATA 19.03.2026
-ORA 15:31:00
+DATA 06.11.2028
+ORA 14:22:33
 BON FISCAL
 Nr: 0066
 NUMARUL FABRICARII
 DEMO00001
 
-0000004457
+0000650321
 `;
 
 const noSubtotalText = `
@@ -78,17 +78,17 @@ describe('parseReceiptText', () => {
     expect(receipt.merchant.name).toBe('DEMO MARKET SRL');
     expect(receipt.merchant.taxId).toBe('1234567890123');
     expect(receipt.eccId).toBe('FAKEECC001');
-    expect(receipt.urlReceiptNumber).toBe('4457');
-    expect(receipt.urlTotal).toBe('20.00');
-    expect(receipt.urlDate).toBe('2026-03-19');
+    expect(receipt.urlReceiptNumber).toBe('650321');
+    expect(receipt.urlTotal).toBe('91.37');
+    expect(receipt.urlDate).toBe('2028-11-06');
     expect(receipt.printedNumber).toBe('0066');
     expect(receipt.deviceNumber).toBe('DEMO00001');
-    expect(receipt.total).toBe('20.00');
+    expect(receipt.total).toBe('91.37');
     expect(receipt.items).toHaveLength(1);
     expect(receipt.items[0].name).toBe('Americano');
     expect(receipt.items[0].quantity).toBe(1);
-    expect(receipt.items[0].unitPrice).toBe(20);
-    expect(receipt.issuedAt).toBe('2026-03-19T15:31:00');
+    expect(receipt.items[0].unitPrice).toBe(91.37);
+    expect(receipt.issuedAt).toBe('2028-11-06T14:22:33');
   });
 
   it('renders ASCII-only thermal output', () => {

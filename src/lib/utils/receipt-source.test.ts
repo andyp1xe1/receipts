@@ -3,17 +3,17 @@ import { normalizeReceiptSource } from './receipt-source';
 
 describe('normalizeReceiptSource', () => {
   it('keeps supported receipt urls', () => {
-    expect(normalizeReceiptSource('https://example.invalid/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06')).toBe(
-      'https://example.invalid/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06'
+    expect(normalizeReceiptSource('https://mev.sfs.md/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06')).toBe(
+      'https://mev.sfs.md/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06'
     );
   });
 
   it('extracts receipt urls from qr payload text', () => {
     expect(
       normalizeReceiptSource(
-        'Scan result: https://example.invalid/receipt/FAKEECC002/63.42/810245/2028-11-09'
+        'Scan result: https://sift-mev.sfs.md/receipt/FAKEECC002/63.42/810245/2028-11-09'
       )
-    ).toBe('https://example.invalid/receipt/FAKEECC002/63.42/810245/2028-11-09');
+    ).toBe('https://sift-mev.sfs.md/receipt/FAKEECC002/63.42/810245/2028-11-09');
   });
 
   it('decodes url-encoded payloads', () => {
@@ -21,7 +21,7 @@ describe('normalizeReceiptSource', () => {
       normalizeReceiptSource(
         'https%3A%2F%2Fsift-mev.sfs.md%2Freceipt%2FFAKE-OPAQUE-TOKEN'
       )
-    ).toBe('https://example.invalid/receipt/FAKE-OPAQUE-TOKEN');
+    ).toBe('https://sift-mev.sfs.md/receipt/FAKE-OPAQUE-TOKEN');
   });
 
   it('rejects non-mev urls', () => {
