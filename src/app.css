@@ -486,13 +486,15 @@ button {
   word-break: break-word;
 }
 
+.ascii-body {
+  background: var(--bg);
+}
+
 .ascii {
   margin: 0;
-  padding: 14px;
+  padding: 0;
   overflow: auto;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #12100f;
+  background: transparent;
   color: #d6d0c9;
   font-size: 12px;
   line-height: 1.45;

@@ -108,7 +108,7 @@
       </div>
 
       <div class="detail-bottom-row">
-        <section class="panel panel-muted">
+        <section class="panel">
           <div class="panel-header">
             <h3 class="panel-title">Source details</h3>
           </div>
@@ -140,7 +140,7 @@
           <div class="panel-header">
             <h3 class="panel-title">Raw receipt</h3>
           </div>
-          <div class="panel-body">
+          <div class="panel-body ascii-body">
             <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
           </div>
         </section>
