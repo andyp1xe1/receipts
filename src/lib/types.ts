@@ -66,3 +66,9 @@ export interface ReceiptRecord {
 export interface ReceiptSummary extends ReceiptRecord {
   parsed: ParsedReceipt;
 }
+
+export interface EnhancedStats {
+  period: 'weekly' | 'monthly' | 'yearly';
+  periodTotals: Array<{ period: string; total: number; count: number }>;
+  categoryByPeriod: Array<{ period: string; category: string; total: number; count: number }>;
+}

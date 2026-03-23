@@ -28,6 +28,8 @@
     "wrangler": "^4.58.0"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "qr-scanner": "^1.4.2"
   }
 }

@@ -1,29 +1,141 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import QrScanner from '$lib/components/qr-scanner.svelte';
-  import { formatCurrency, formatMonthLabel, formatDateTime, slugCategory } from '$lib/utils/format';
+  import { formatCurrency, formatMonthLabel, formatDateTime, formatPeriodLabel, slugCategory } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
+  type ExportScope = 'current' | 'all' | 'custom';
+
   let sourceUrl = $state('');
   let appliedForm = $state<ActionData | null>(null);
   let sourceInput: HTMLInputElement | null = null;
+  let exportScope = $state<ExportScope>('all');
+  let exportFrom = $state('');
+  let exportTo = $state('');
+  let exportCategory = $state('');
+  let exportLimit = $state('all');
+  let exportPreviewTotal = $state(0);
+  let exportPreviewLimited = $state(0);
+  let exportPreviewLoading = $state(false);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const currentMonthTotal = $derived(
     data.stats.monthlySpend.find((month) => month.month === currentMonth)?.total ?? 0
   );
-  const maxMonthlyTotal = $derived.by(() =>
-    data.stats.monthlySpend.reduce((max, m) => Math.max(max, m.total), 0)
+  const maxPeriodTotal = $derived.by(() =>
+    data.enhancedStats.periodTotals.reduce((max, p) => Math.max(max, p.total), 0)
   );
   const maxCategoryTotal = $derived.by(() =>
     data.stats.topCategories.reduce((max, c) => Math.max(max, c.total), 0)
   );
+
+  function defaultFromDate(month: string | null): string {
+    return month ? `${month}-01` : '';
+  }
+
+  function defaultToDate(month: string | null): string {
+    if (!month) return '';
+    const [year, rawMonth] = month.split('-').map(Number);
+    const lastDay = new Date(Date.UTC(year, rawMonth, 0));
+    return lastDay.toISOString().slice(0, 10);
+  }
+
+  function exportUrl(format: string, overrides: { pdfMode?: 'compact' | 'full' } = {}): string {
+    const params = exportParams(overrides);
+    const qs = params.toString();
+    return `/api/export/${format}${qs ? `?${qs}` : ''}`;
+  }
+
+  function exportParams(overrides: { pdfMode?: 'compact' | 'full' } = {}): URLSearchParams {
+    const params = new URLSearchParams();
+
+    if (exportScope === 'current') {
+      if (data.month) params.set('month', data.month);
+      if (data.category) params.set('category', data.category);
+    }
+
+    if (exportScope === 'custom') {
+      if (exportFrom) params.set('from', exportFrom);
+      if (exportTo) params.set('to', exportTo);
+      if (exportCategory) params.set('category', exportCategory);
+    }
+
+    if (exportLimit !== 'all') params.set('limit', exportLimit);
+    if (overrides.pdfMode === 'full') params.set('pdf_mode', 'full');
+
+    return params;
+  }
+
+  function currentFiltersLabel(): string {
+    const parts: string[] = [];
+    if (data.month) parts.push(formatMonthLabel(data.month));
+    if (data.category) parts.push(data.category === '__unsorted__' ? 'Unsorted' : data.category);
+    return parts.length ? parts.join(' - ') : 'No page filters';
+  }
+
+  function previewLabel(): string {
+    if (exportPreviewLoading) return 'Checking receipts...';
+    if (exportPreviewTotal === exportPreviewLimited) {
+      return `${exportPreviewTotal} receipt${exportPreviewTotal === 1 ? '' : 's'} ready`;
+    }
+
+    return `${exportPreviewTotal} match, exporting ${exportPreviewLimited}`;
+  }
+
+  function useCustomScope() {
+    exportScope = 'custom';
+  }
+
+  function periodTabUrl(period: string): string {
+    const params = new URLSearchParams();
+    if (data.month) params.set('month', data.month);
+    if (data.category) params.set('category', data.category);
+    params.set('period', period);
+    return `/?${params.toString()}`;
+  }
 
   $effect(() => {
     if (!form || form === appliedForm) return;
     const values = 'values' in form ? (form.values as Record<string, string | undefined>) : null;
     sourceUrl = values?.source_url ?? '';
     appliedForm = form;
+  });
+
+  $effect(() => {
+    exportScope = data.month || data.category ? 'current' : 'all';
+    exportFrom = defaultFromDate(data.month);
+    exportTo = defaultToDate(data.month);
+    exportCategory = data.category ?? '';
+    exportLimit = 'all';
+    exportPreviewTotal = data.receipts.length;
+    exportPreviewLimited = data.receipts.length;
+    exportPreviewLoading = false;
+  });
+
+  $effect(() => {
+    if (!browser) return;
+
+    const controller = new AbortController();
+    const params = exportParams();
+    exportPreviewLoading = true;
+
+    window.fetch(`/api/export/preview?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Preview failed');
+        const payload = (await response.json()) as { total: number; limited: number };
+        exportPreviewTotal = payload.total;
+        exportPreviewLimited = payload.limited;
+        exportPreviewLoading = false;
+      })
+      .catch((error) => {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        exportPreviewTotal = 0;
+        exportPreviewLimited = 0;
+        exportPreviewLoading = false;
+      });
+
+    return () => controller.abort();
   });
 
   function handleScannerResult(value: string) {
@@ -83,22 +195,28 @@
     </section>
 
     <!-- Stats strip -->
-    {#if data.stats.monthlySpend.length || data.stats.topCategories.length}
+    {#if data.enhancedStats.periodTotals.length || data.stats.topCategories.length}
       <div class="stats-strip">
-        {#if data.stats.monthlySpend.length}
-          <div class="stats-group">
-            <div class="stats-group-label">Monthly</div>
-            {#each data.stats.monthlySpend.slice(-4).reverse() as month}
-              <div class="stat-row">
-                <span class="stat-label">{formatMonthLabel(month.month)}</span>
-                <div class="stat-bar-track">
-                  <div class="stat-bar-fill" style={`width:${maxMonthlyTotal ? (month.total / maxMonthlyTotal) * 100 : 0}%`}></div>
-                </div>
-                <span class="stat-value">{formatCurrency(month.total)}</span>
-              </div>
-            {/each}
+        <div class="stats-group">
+          <div class="stats-group-header">
+            <div class="period-tabs">
+              {#each ['weekly', 'monthly', 'yearly'] as p}
+                <a class={`period-tab ${data.period === p ? 'active' : ''}`} href={periodTabUrl(p)}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </a>
+              {/each}
+            </div>
           </div>
-        {/if}
+          {#each data.enhancedStats.periodTotals.slice(0, 6) as entry}
+            <div class="stat-row">
+              <span class="stat-label">{formatPeriodLabel(data.enhancedStats.period, entry.period)}</span>
+              <div class="stat-bar-track">
+                <div class="stat-bar-fill" style={`width:${maxPeriodTotal ? (entry.total / maxPeriodTotal) * 100 : 0}%`}></div>
+              </div>
+              <span class="stat-value">{formatCurrency(entry.total)}</span>
+            </div>
+          {/each}
+        </div>
         {#if data.stats.topCategories.length}
           <div class="stats-group">
             <div class="stats-group-label">Categories</div>
@@ -145,6 +263,92 @@
         </a>
       {/each}
     </div>
+
+    <details class="panel export-panel">
+      <summary class="export-summary">
+        <span>Export receipts</span>
+        <span class="export-summary-value">
+          {#if exportScope === 'current'}
+            Current view
+          {:else if exportScope === 'custom'}
+            Custom range
+          {:else}
+            All receipts
+          {/if}
+        </span>
+      </summary>
+
+      <div class="export-panel-body stack-sm">
+        <div class="export-grid">
+          <label class="field">
+            <span class="label">Range</span>
+            <select class="select" bind:value={exportScope}>
+              <option value="all">All receipts</option>
+              <option value="current">Current page filters</option>
+              <option value="custom">Custom dates</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="label">Max receipts</span>
+            <select class="select" bind:value={exportLimit}>
+              <option value="all">All matches</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="label">From</span>
+            <input
+              class="input"
+              type="date"
+              bind:value={exportFrom}
+              onfocus={useCustomScope}
+              onchange={useCustomScope}
+            />
+          </label>
+
+          <label class="field">
+            <span class="label">To</span>
+            <input
+              class="input"
+              type="date"
+              bind:value={exportTo}
+              onfocus={useCustomScope}
+              onchange={useCustomScope}
+            />
+          </label>
+
+          <label class="field export-grid-wide">
+            <span class="label">Category</span>
+            <select class="select" bind:value={exportCategory} onchange={useCustomScope}>
+              <option value="">All categories</option>
+              <option value="__unsorted__">Unsorted</option>
+              {#each data.exportCategories.filter((category) => category !== 'Unsorted') as category}
+                <option value={category}>{category}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
+
+        <div class="export-meta-row">
+          {#if exportScope === 'current'}
+            <div class="export-note">Current filters: {currentFiltersLabel()}</div>
+          {/if}
+          <div class="export-note">{previewLabel()}</div>
+        </div>
+
+        <div class="export-actions">
+          <a class="button-secondary export-link" href={exportUrl('csv')}>Download CSV</a>
+          <a class="button-secondary export-link" href={exportUrl('json')}>Download full JSON</a>
+          <a class="button-secondary export-link" href={exportUrl('pdf')}>Download PDF compact</a>
+          <a class="button-secondary export-link" href={exportUrl('pdf', { pdfMode: 'full' })}>Download PDF full</a>
+        </div>
+      </div>
+    </details>
 
     <!-- Ledger -->
     <section class="panel">

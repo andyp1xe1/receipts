@@ -105,6 +105,12 @@ button {
   gap: 16px;
 }
 
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Compact import bar */
 .import-bar {
   display: flex;
@@ -551,6 +557,95 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Export panel */
+.export-panel {
+  overflow: hidden;
+}
+
+.export-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.export-summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-summary-value,
+.export-note {
+  color: var(--muted);
+}
+
+.export-panel[open] .export-summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.export-panel-body {
+  padding: 16px;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.export-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.export-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.export-link {
+  font-size: 13px;
+}
+
+/* Period tabs */
+.stats-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.period-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.period-tab {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.period-tab.active {
+  color: var(--text);
+  background: var(--panel-soft);
+  border-color: var(--border);
+}
+
 /* Detail bottom row: source + receipt side by side, independent heights */
 .detail-bottom-row {
   display: grid;
@@ -586,7 +681,8 @@ button {
 
   .summary-grid,
   .two-column,
-  .detail-bottom-row {
+  .detail-bottom-row,
+  .export-grid {
     grid-template-columns: 1fr;
   }
 
@@ -630,6 +726,14 @@ button {
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .export-actions {
+    flex-direction: column;
+  }
+
+  .export-link {
+    width: 100%;
   }
 
   .meta-grid {

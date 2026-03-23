@@ -2,8 +2,10 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import {
   getDashboardStats,
+  getEnhancedStats,
   getExistingReceiptByCanonicalKey,
   insertReceipt,
+  listReceiptCategories,
   listReceipts
 } from '$lib/server/db';
 import { fetchAndParseReceipt } from '$lib/server/mev';
@@ -12,17 +14,29 @@ import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 export const load: PageServerLoad = async ({ platform, url }) => {
   const month = url.searchParams.get('month');
   const category = url.searchParams.get('category');
-  const [receipts, stats] = await Promise.all([
+  const periodParam = url.searchParams.get('period');
+  const period = (['weekly', 'monthly', 'yearly'] as const).includes(
+    periodParam as 'weekly' | 'monthly' | 'yearly'
+  )
+    ? (periodParam as 'weekly' | 'monthly' | 'yearly')
+    : 'monthly';
+
+  const [receipts, stats, enhancedStats, exportCategories] = await Promise.all([
     listReceipts(platform, { month, category }),
-    getDashboardStats(platform)
+    getDashboardStats(platform),
+    getEnhancedStats(platform, period),
+    listReceiptCategories(platform)
   ]);
 
   return {
     month,
     category,
+    period,
     receipts,
     stats,
-    categories: [...new Set(receipts.map((receipt) => receipt.category || 'Unsorted'))]
+    enhancedStats,
+    categories: [...new Set(receipts.map((receipt) => receipt.category || 'Unsorted'))],
+    exportCategories
   };
 };
 
