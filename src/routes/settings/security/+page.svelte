@@ -31,7 +31,7 @@
     </div>
   </header>
 
-  <div class="stack" style="padding-top: 16px;">
+  <div class="stack settings-body page-column">
     {#if data.welcome}
       <div class="alert compact">Your account is ready. Next step: turn on TOTP and save your backup codes.</div>
     {/if}
@@ -84,7 +84,7 @@
         {#if form?.stage === 'regenerate' && form?.message}
           <div class="alert success">{form.message}</div>
         {:else if form?.stage === 'disable' && form?.message}
-          <div class={`alert ${form.stage === 'disable' && form.message.includes('disabled') ? 'success' : 'error'}`}>{form.message}</div>
+          <div class={`alert ${form.type === 'success' ? 'success' : 'error'}`}>{form.message}</div>
         {/if}
 
         {#if form?.backupCodes?.length}
@@ -102,13 +102,16 @@
           <button class="button-secondary" type="submit">Generate fresh backup codes</button>
         </form>
 
-        <form method="POST" action="?/disable" class="stack-sm">
-          <label class="field">
-            <span class="label">Password</span>
-            <input class="input" type="password" name="password" autocomplete="current-password" required />
-          </label>
-          <button class="button-danger" type="submit">Disable two-factor authentication</button>
-        </form>
+        <details class="disable-details">
+          <summary class="button-danger">Disable two-factor authentication</summary>
+          <form method="POST" action="?/disable" class="stack-sm disable-form">
+            <label class="field">
+              <span class="label">Password</span>
+              <input class="input" type="password" name="password" autocomplete="current-password" required />
+            </label>
+            <button class="button-danger" type="submit">Confirm disable</button>
+          </form>
+        </details>
       </section>
     {:else}
       <div class="security-grid">
