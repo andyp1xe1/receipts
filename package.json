@@ -10,9 +10,23 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:mev-live": "vitest run src/lib/server/mev.private.test.ts",
-    "db:migrate:local": "wrangler d1 migrations apply receipts-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply receipts-db --remote",
-    "deploy": "vite build && wrangler deploy"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "vite build && wrangler d1 migrations apply DB --remote && wrangler deploy"
+  },
+  "cloudflare": {
+    "bindings": {
+      "BETTER_AUTH_SECRET": {
+        "description": "Generate a long random secret, for example with `openssl rand -hex 32`."
+      },
+      "SETUP_TOKEN": {
+        "description": "Set a one-time bootstrap token for first-run admin creation. Use a long random value such as `openssl rand -hex 32`."
+      },
+      "DB": {
+        "description": "Primary D1 database for receipts and Better Auth tables. A fresh database is provisioned during Deploy to Cloudflare setup."
+      }
+    }
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260317.1",
@@ -20,6 +34,8 @@
     "@sveltejs/kit": "^2.39.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@types/node": "^25.5.0",
+    "@types/qrcode": "^1.5.6",
+    "drizzle-kit": "^0.31.10",
     "svelte": "^5.39.5",
     "svelte-check": "^4.3.3",
     "typescript": "^5.9.2",
@@ -28,8 +44,11 @@
     "wrangler": "^4.58.0"
   },
   "dependencies": {
+    "better-auth": "^1.5.6",
+    "drizzle-orm": "^0.45.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "qr-scanner": "^1.4.2"
+    "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4"
   }
 }
