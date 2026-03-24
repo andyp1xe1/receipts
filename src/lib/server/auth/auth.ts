@@ -1,0 +1,86 @@
+import { env as privateEnv } from '$env/dynamic/private';
+import { getRequestEvent } from '$app/server';
+import type { RequestEvent } from '@sveltejs/kit';
+import { APIError } from 'better-auth/api';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { betterAuth } from 'better-auth';
+import { sveltekitCookies } from 'better-auth/svelte-kit';
+import { twoFactor } from 'better-auth/plugins/two-factor';
+import { AuthConfigurationError } from '$lib/server/auth/errors';
+import { countAuthUsers } from '$lib/server/auth/state';
+import { getDb } from '$lib/server/db/db';
+import { authSchema } from '$lib/server/db/schema';
+
+function requireSecret(event: RequestEvent): string {
+  const secret = event.platform?.env.BETTER_AUTH_SECRET ?? privateEnv.BETTER_AUTH_SECRET;
+  if (!secret) {
+    throw new AuthConfigurationError('BETTER_AUTH_SECRET is required');
+  }
+
+  return secret;
+}
+
+export function getSetupToken(event: RequestEvent): string | null {
+  const token = event.platform?.env.SETUP_TOKEN ?? privateEnv.SETUP_TOKEN;
+  return token?.trim() ? token : null;
+}
+
+export function createAuth(event: RequestEvent) {
+  if (!event.platform?.env.DB) {
+    throw new AuthConfigurationError('Cloudflare D1 binding is not available');
+  }
+
+  const db = getDb(event.platform);
+
+  return betterAuth({
+    appName: 'Receipt Ledger',
+    baseURL: event.platform?.env.BETTER_AUTH_URL ?? privateEnv.BETTER_AUTH_URL ?? event.url.origin,
+    secret: requireSecret(event),
+    database: drizzleAdapter(db, {
+      provider: 'sqlite',
+      schema: authSchema
+    }),
+    emailAndPassword: {
+      enabled: true,
+      disableSignUp: false,
+      minPasswordLength: 12
+    },
+    trustedOrigins: [event.url.origin],
+    advanced: {
+      useSecureCookies: event.url.protocol === 'https:',
+      ipAddress: {
+        ipAddressHeaders: ['cf-connecting-ip', 'x-forwarded-for']
+      }
+    },
+    hooks: {
+      before: async (ctx) => {
+        if ((ctx as { path?: string }).path !== '/sign-up/email') return;
+
+        const existingUsers = await countAuthUsers(event.platform);
+        if (existingUsers > 0) {
+          throw new APIError('FORBIDDEN', {
+            message: 'Sign up is disabled after the first account is created.'
+          });
+        }
+
+        const setupToken = getSetupToken(event);
+        if (!setupToken) {
+          throw new APIError('FORBIDDEN', {
+            message: 'SETUP_TOKEN must be configured before creating the first account.'
+          });
+        }
+
+        if (new Headers(ctx.headers).get('x-setup-token') !== setupToken) {
+          throw new APIError('FORBIDDEN', {
+            message: 'A valid setup token is required to create the first account.'
+          });
+        }
+      }
+    },
+    plugins: [twoFactor({ issuer: 'Receipt Ledger' }), sveltekitCookies(getRequestEvent)]
+  });
+}
+
+export type AuthSession = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof createAuth>['api']['getSession']>>
+>;
