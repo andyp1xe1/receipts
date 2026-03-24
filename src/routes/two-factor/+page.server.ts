@@ -3,9 +3,17 @@ import type { Actions, PageServerLoad } from './$types';
 import { createAuth } from '$lib/server/auth/auth';
 import { authErrorMessage, isHttpControlFlow } from '$lib/server/auth/errors';
 
-export const load: PageServerLoad = async ({ locals }) => {
+function hasPendingTwoFactorChallenge(cookies: Parameters<PageServerLoad>[0]['cookies']): boolean {
+  return Boolean(cookies.get('better-auth.two_factor') || cookies.get('__Secure-better-auth.two_factor'));
+}
+
+export const load: PageServerLoad = async ({ cookies, locals }) => {
   if (locals.user) {
     throw redirect(303, '/');
+  }
+
+  if (!hasPendingTwoFactorChallenge(cookies)) {
+    throw redirect(303, '/login');
   }
 
   return {};
@@ -13,6 +21,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
   verifyTotp: async (event) => {
+    if (!hasPendingTwoFactorChallenge(event.cookies)) {
+      throw redirect(303, '/login');
+    }
+
     const formData = await event.request.formData();
     const code = String(formData.get('code') ?? '').trim();
     const trustDevice = formData.get('trust_device') === 'on';
@@ -42,6 +54,10 @@ export const actions: Actions = {
   },
 
   verifyBackupCode: async (event) => {
+    if (!hasPendingTwoFactorChallenge(event.cookies)) {
+      throw redirect(303, '/login');
+    }
+
     const formData = await event.request.formData();
     const code = String(formData.get('backup_code') ?? '').trim();
     const trustDevice = formData.get('backup_trust_device') === 'on';

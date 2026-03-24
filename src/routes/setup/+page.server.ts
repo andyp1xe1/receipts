@@ -62,6 +62,11 @@ export const actions: Actions = {
         headers
       });
 
+      await auth.api.signInEmail({
+        body: { email, password },
+        headers: event.request.headers
+      });
+
       throw redirect(303, '/settings/security?welcome=1');
     } catch (error) {
       if (isHttpControlFlow(error)) throw error;

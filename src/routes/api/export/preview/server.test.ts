@@ -8,10 +8,22 @@ import { GET } from './+server';
 import { countReceipts } from '$lib/server/db/receipts';
 
 describe('export preview api', () => {
+  it('returns 401 when the request is unauthenticated', async () => {
+    const response = await GET({
+      locals: { user: null },
+      platform: undefined,
+      url: new URL('https://example.test/api/export/preview')
+    } as Parameters<typeof GET>[0]);
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe('Unauthorized');
+  });
+
   it('returns total and limited counts with parsed filters', async () => {
     vi.mocked(countReceipts).mockResolvedValue(42);
 
     const response = await GET({
+      locals: { user: { id: 'u1' } },
       platform: undefined,
       url: new URL('https://example.test/api/export/preview?month=2026-03&category=Fuel&limit=10')
     } as Parameters<typeof GET>[0]);
@@ -32,6 +44,7 @@ describe('export preview api', () => {
     vi.mocked(countReceipts).mockResolvedValue(7);
 
     const response = await GET({
+      locals: { user: { id: 'u1' } },
       platform: undefined,
       url: new URL('https://example.test/api/export/preview?limit=all')
     } as Parameters<typeof GET>[0]);
@@ -51,6 +64,7 @@ describe('export preview api', () => {
     vi.mocked(countReceipts).mockResolvedValue(12);
 
     const response = await GET({
+      locals: { user: { id: 'u1' } },
       platform: undefined,
       url: new URL('https://example.test/api/export/preview?limit=0&pdf_mode=full&from=2026-01-01&to=2026-01-31')
     } as Parameters<typeof GET>[0]);

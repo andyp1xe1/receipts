@@ -90,8 +90,9 @@ describe('setup page', () => {
   it('forwards the provided setup token to signup', async () => {
     vi.mocked(getSetupToken).mockReturnValue('expected-token');
     const signUpEmail = vi.fn().mockResolvedValue({});
+    const signInEmail = vi.fn().mockResolvedValue({});
     vi.mocked(createAuth).mockReturnValue({
-      api: { signUpEmail }
+      api: { signInEmail, signUpEmail }
     } as never);
 
     await expect(
@@ -108,6 +109,13 @@ describe('setup page', () => {
     const call = signUpEmail.mock.calls[0][0] as { headers: Headers; body: { email: string } };
     expect(call.body.email).toBe('admin@example.test');
     expect(call.headers.get('x-setup-token')).toBe('provided-token');
+    expect(signInEmail).toHaveBeenCalledWith({
+      body: {
+        email: 'admin@example.test',
+        password: 'secretsecret'
+      },
+      headers: expect.any(Headers)
+    });
   });
 
   it('surfaces invalid setup token errors without leaking config details', async () => {

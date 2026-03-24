@@ -11,11 +11,64 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
   return {
     justConfigured: url.searchParams.get('enabled') === '1',
+    passwordUpdated: url.searchParams.get('password') === 'updated',
     welcome: url.searchParams.get('welcome') === '1'
   };
 };
 
 export const actions: Actions = {
+  password: async (event) => {
+    if (!event.locals.user) {
+      throw redirect(303, '/login');
+    }
+
+    const formData = await event.request.formData();
+    const currentPassword = String(formData.get('current_password') ?? '');
+    const newPassword = String(formData.get('new_password') ?? '');
+    const confirmPassword = String(formData.get('confirm_password') ?? '');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return fail(400, {
+        stage: 'password',
+        message: 'Enter your current password, new password, and confirmation.'
+      });
+    }
+
+    if (newPassword.length < 12) {
+      return fail(400, {
+        stage: 'password',
+        message: 'Use at least 12 characters for the new password.'
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return fail(400, {
+        stage: 'password',
+        message: 'New password and confirmation must match.'
+      });
+    }
+
+    try {
+      await createAuth(event).api.changePassword({
+        body: {
+          currentPassword,
+          newPassword,
+          revokeOtherSessions: true
+        },
+        headers: event.request.headers
+      });
+
+      throw redirect(303, '/settings/security?password=updated');
+    } catch (error) {
+      if (isHttpControlFlow(error)) throw error;
+
+      return fail(400, {
+        stage: 'password',
+        message: authErrorMessage(error, 'Could not update your password.')
+      });
+    }
+  },
+
   enable: async (event) => {
     if (!event.locals.user) {
       throw redirect(303, '/login');

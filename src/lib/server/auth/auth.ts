@@ -11,6 +11,8 @@ import { countAuthUsers } from '$lib/server/auth/state';
 import { getDb } from '$lib/server/db/db';
 import { authSchema } from '$lib/server/db/schema';
 
+const textEncoder = new TextEncoder();
+
 function requireSecret(event: RequestEvent): string {
   const secret = event.platform?.env.BETTER_AUTH_SECRET ?? privateEnv.BETTER_AUTH_SECRET;
   if (!secret) {
@@ -23,6 +25,19 @@ function requireSecret(event: RequestEvent): string {
 export function getSetupToken(event: RequestEvent): string | null {
   const token = event.platform?.env.SETUP_TOKEN ?? privateEnv.SETUP_TOKEN;
   return token?.trim() ? token : null;
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const left = textEncoder.encode(a);
+  const right = textEncoder.encode(b);
+  const maxLength = Math.max(left.length, right.length);
+  let mismatch = left.length === right.length ? 0 : 1;
+
+  for (let index = 0; index < maxLength; index += 1) {
+    mismatch |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  }
+
+  return mismatch === 0;
 }
 
 export function createAuth(event: RequestEvent) {
@@ -70,7 +85,7 @@ export function createAuth(event: RequestEvent) {
           });
         }
 
-        if (new Headers(ctx.headers).get('x-setup-token') !== setupToken) {
+        if (!constantTimeEqual(new Headers(ctx.headers).get('x-setup-token') ?? '', setupToken)) {
           throw new APIError('FORBIDDEN', {
             message: 'A valid setup token is required to create the first account.'
           });

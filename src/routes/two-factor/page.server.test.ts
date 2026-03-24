@@ -19,6 +19,9 @@ function makeEvent(form: Record<string, string>) {
 
   return {
     request,
+    cookies: {
+      get: vi.fn((name: string) => (name === 'better-auth.two_factor' ? 'pending' : undefined))
+    },
     locals: {
       authTablesReady: true,
       authSetupComplete: true,
@@ -26,21 +29,36 @@ function makeEvent(form: Record<string, string>) {
       user: null
     },
     url: new URL('https://example.test/two-factor')
-  } as Parameters<typeof actions.verifyTotp>[0] & { request: Request };
+  } as unknown as Parameters<typeof actions.verifyTotp>[0] & { request: Request };
 }
 
 describe('two-factor page', () => {
   it('redirects authenticated users away from the page', async () => {
     await expect(
       load({
+        cookies: { get: vi.fn() },
         locals: {
           authTablesReady: true,
           authSetupComplete: true,
           session: null,
           user: { id: 'u1' }
         }
-      } as Parameters<typeof load>[0])
+      } as unknown as Parameters<typeof load>[0])
     ).rejects.toMatchObject({ status: 303, location: '/' });
+  });
+
+  it('redirects to login when no two-factor challenge is pending', async () => {
+    await expect(
+      load({
+        cookies: { get: vi.fn(() => undefined) },
+        locals: {
+          authTablesReady: true,
+          authSetupComplete: true,
+          session: null,
+          user: null
+        }
+      } as unknown as Parameters<typeof load>[0])
+    ).rejects.toMatchObject({ status: 303, location: '/login' });
   });
 
   it('validates missing totp code', async () => {

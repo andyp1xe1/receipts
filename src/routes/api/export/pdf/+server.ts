@@ -5,7 +5,11 @@ import { readExportFilters } from '$lib/server/export/export';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const GET: RequestHandler = async ({ platform, url }) => {
+export const GET: RequestHandler = async ({ locals, platform, url }) => {
+  if (!locals.user) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const filters = readExportFilters(url);
   const receipts = await listReceiptsForExport(platform, filters, { limit: filters.limit });
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });

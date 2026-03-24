@@ -3,7 +3,11 @@ import type { ParsedReceipt } from '$lib/types';
 import { listReceiptsForExport } from '$lib/server/db/receipts';
 import { readExportFilters } from '$lib/server/export/export';
 
-export const GET: RequestHandler = async ({ platform, url }) => {
+export const GET: RequestHandler = async ({ locals, platform, url }) => {
+  if (!locals.user) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const filters = readExportFilters(url);
   const receipts = await listReceiptsForExport(platform, filters, { limit: filters.limit });
 

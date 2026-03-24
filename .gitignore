@@ -3,6 +3,7 @@ node_modules/
 .wrangler/
 .dev.vars
 wrangler.private.jsonc
+tmp/
 .claude/
 .junie/
 skills-lock.json

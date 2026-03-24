@@ -58,16 +58,95 @@ describe('settings/security page', () => {
         session: null,
         user: { id: 'u1' } as App.Locals['user']
       },
-      url: new URL('https://example.test/settings/security?enabled=1&welcome=1')
+      url: new URL('https://example.test/settings/security?enabled=1&welcome=1&password=updated')
     } as Parameters<typeof load>[0]);
 
-    expect(result).toEqual({ justConfigured: true, welcome: true });
+    expect(result).toEqual({ justConfigured: true, passwordUpdated: true, welcome: true });
   });
 
   it('redirects unauthenticated actions to login', async () => {
     await expect(actions.enable(makeEvent({ password: 'secretsecret' }, false))).rejects.toMatchObject({
       status: 303,
       location: '/login'
+    });
+  });
+
+  it('validates password change fields before calling auth', async () => {
+    const result = await actions.password(
+      makeEvent({ current_password: '', new_password: '', confirm_password: '' })
+    );
+
+    expect(result).toMatchObject({
+      status: 400,
+      data: {
+        stage: 'password',
+        message: 'Enter your current password, new password, and confirmation.'
+      }
+    });
+    expect(createAuth).not.toHaveBeenCalled();
+  });
+
+  it('validates password confirmation matches', async () => {
+    const result = await actions.password(
+      makeEvent({
+        current_password: 'old-password',
+        new_password: 'new-password-123',
+        confirm_password: 'different-password'
+      })
+    );
+
+    expect(result).toMatchObject({
+      status: 400,
+      data: { stage: 'password', message: 'New password and confirmation must match.' }
+    });
+  });
+
+  it('changes the password and revokes other sessions', async () => {
+    const changePassword = vi.fn().mockResolvedValue({});
+    vi.mocked(createAuth).mockReturnValue({
+      api: { changePassword }
+    } as never);
+
+    await expect(
+      actions.password(
+        makeEvent({
+          current_password: 'old-password',
+          new_password: 'new-password-123',
+          confirm_password: 'new-password-123'
+        })
+      )
+    ).rejects.toMatchObject({ status: 303, location: '/settings/security?password=updated' });
+
+    expect(changePassword).toHaveBeenCalledWith({
+      body: {
+        currentPassword: 'old-password',
+        newPassword: 'new-password-123',
+        revokeOtherSessions: true
+      },
+      headers: expect.any(Headers)
+    });
+  });
+
+  it('surfaces api password change failures', async () => {
+    vi.mocked(createAuth).mockReturnValue({
+      api: {
+        changePassword: vi.fn().mockRejectedValue(
+          new APIError('UNAUTHORIZED', { message: 'Invalid current password.' })
+        )
+      }
+    } as never);
+
+    const result = await actions.password(
+      makeEvent({
+        current_password: 'wrong-password',
+        new_password: 'new-password-123',
+        confirm_password: 'new-password-123'
+      })
+    );
+
+    expect(result).toMatchObject({
+      status: 400,
+      data: { stage: 'password', message: 'Invalid current password.' }
     });
   });
 
