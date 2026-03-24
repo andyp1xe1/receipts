@@ -2,7 +2,7 @@
 
 Receipt tracker for Moldova MEV receipts.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/your-org/receipts)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/andyp1xe1/receipts)
 
 ## What it does
 
