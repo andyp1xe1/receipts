@@ -195,11 +195,13 @@ export const actions: Actions = {
 
       return {
         stage: 'disable',
+        type: 'success' as const,
         message: 'Two-factor authentication is now disabled.'
       };
     } catch (error) {
       return fail(400, {
         stage: 'disable',
+        type: 'error' as const,
         message: authErrorMessage(error, 'Could not disable two-factor authentication.')
       });
     }

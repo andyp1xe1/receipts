@@ -16,36 +16,27 @@
       <p class="auth-copy">Use your authenticator app or one of your backup codes.</p>
     </div>
 
-    <div class="auth-grid">
-      <form method="POST" action="?/verifyTotp" class="panel panel-body stack-sm">
-        <div class="stack-sm">
-          <h2 class="panel-title">Authenticator code</h2>
-          <p class="section-note">Enter the current 6-digit code.</p>
-        </div>
+    <form method="POST" action="?/verifyTotp" class="stack-sm">
+      {#if form?.type === 'totp' && form?.message}
+        <div class="alert error">{form.message}</div>
+      {/if}
 
-        {#if form?.type === 'totp' && form?.message}
-          <div class="alert error">{form.message}</div>
-        {/if}
+      <label class="field">
+        <span class="label">Authenticator code</span>
+        <input class="input" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required />
+      </label>
 
-        <label class="field">
-          <span class="label">Code</span>
-          <input class="input" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required />
-        </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="trust_device" />
+        <span>Trust this device for 30 days</span>
+      </label>
 
-        <label class="checkbox-row">
-          <input type="checkbox" name="trust_device" />
-          <span>Trust this device for 30 days</span>
-        </label>
+      <button class="button auth-submit" type="submit">Verify code</button>
+    </form>
 
-        <button class="button" type="submit">Verify code</button>
-      </form>
-
-      <form method="POST" action="?/verifyBackupCode" class="panel panel-body stack-sm">
-        <div class="stack-sm">
-          <h2 class="panel-title">Backup code</h2>
-          <p class="section-note">Use a one-time recovery code if your authenticator is unavailable.</p>
-        </div>
-
+    <details class="backup-details">
+      <summary class="backup-summary">Use a backup code instead</summary>
+      <form method="POST" action="?/verifyBackupCode" class="stack-sm backup-form">
         {#if form?.type === 'backup' && form?.message}
           <div class="alert error">{form.message}</div>
         {/if}
@@ -60,8 +51,8 @@
           <span>Trust this device for 30 days</span>
         </label>
 
-        <button class="button-secondary" type="submit">Use backup code</button>
+        <button class="button-secondary auth-submit" type="submit">Use backup code</button>
       </form>
-    </div>
+    </details>
   </section>
 </div>
