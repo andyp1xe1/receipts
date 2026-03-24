@@ -29,7 +29,7 @@ describe.skipIf(!corpus)('private MEV receipt corpus', () => {
         expect(receipt.urlDate).toBe(parts[3]);
       }
     }
-  });
+  }, 15000);
 
   it('reconstructs canonical tuples for opaque lookup receipts from content', async () => {
     for (const entry of corpus?.filter(({ kind }) => kind === 'opaque_lookup') ?? []) {

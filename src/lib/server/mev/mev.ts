@@ -9,6 +9,11 @@ const timePattern = /ORA\s+(?<time>\d{2}:\d{2}:\d{2})/i;
 const numberPattern = /(\d+)$/;
 const fullNumberPattern = /^\d+$/;
 const fourPartUrlPattern = /https:\/\/[^/]+\/(?:receipt|receipt-verifier)\/(?<ecc>[^/]+)\/(?<total>[^/]+)\/(?<receipt>[^/]+)\/(?<date>\d{4}-\d{2}-\d{2})\/?$/;
+const stripHtmlBlocksPattern = /<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi;
+const stripHtmlOpenLineBreakPattern = /<(br|div|p|section|article|li|tr|td|th|h1|h2|h3|h4|h5|h6)[^>]*>/gi;
+const stripHtmlCloseLineBreakPattern = /<\/(div|p|section|article|li|tr|td|th|h1|h2|h3|h4|h5|h6)>/gi;
+const stripHtmlTagPattern = /<[^>]+>/g;
+const paymentLabels = ['INTRODUS', 'CARD', 'REST'] as const;
 
 const browserLikeHeaders = {
   'user-agent':
@@ -152,16 +157,24 @@ function parsePayments(lines: string[]): Payments {
   const dateIndex = lines.findIndex((line) => line.startsWith('DATA '));
   const paymentLines = lines.slice(0, dateIndex === -1 ? lines.length : dateIndex);
 
-  for (const label of ['INTRODUS', 'CARD', 'REST']) {
+  for (const label of paymentLabels) {
     const labelIndex = paymentLines.indexOf(label);
     if (labelIndex === -1) continue;
     const amount = moneyValue(nextValue(paymentLines, labelIndex) ?? undefined) ?? 0;
-    if (label === 'INTRODUS') payments.cashGiven = amount;
-    if (label === 'CARD') payments.card = amount;
-    if (label === 'REST') payments.change = amount;
+    switch (label) {
+      case 'INTRODUS':
+        payments.cashGiven = amount;
+        break;
+      case 'CARD':
+        payments.card = amount;
+        break;
+      case 'REST':
+        payments.change = amount;
+        break;
+    }
   }
 
-  const known = new Set(['INTRODUS', 'CARD', 'REST']);
+  const known = new Set<string>(paymentLabels);
   for (let index = 0; index < paymentLines.length; index += 1) {
     const line = paymentLines[index];
     if (known.has(line) || isSeparator(line)) continue;
@@ -219,10 +232,10 @@ function canonicalTupleFromLines(lines: string[]) {
 function stripHtmlToText(html: string): string {
   return decodeHtml(
     html
-      .replace(/<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-      .replace(/<(br|div|p|section|article|li|tr|td|th|h1|h2|h3|h4|h5|h6)[^>]*>/gi, '\n')
-      .replace(/<\/(div|p|section|article|li|tr|td|th|h1|h2|h3|h4|h5|h6)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
+      .replace(stripHtmlBlocksPattern, ' ')
+      .replace(stripHtmlOpenLineBreakPattern, '\n')
+      .replace(stripHtmlCloseLineBreakPattern, '\n')
+      .replace(stripHtmlTagPattern, ' ')
   );
 }
 
@@ -393,7 +406,12 @@ export function parseReceiptText(textOrHtml: string, sourceUrl: string): ParsedR
     printedNumber,
     deviceNumber,
     items: parseItems(lines, eccIndex, totalIndex),
-    subtotal: subtotalIndex === null ? null : (moneyValue(nextValue(lines, subtotalIndex) ?? undefined) !== null ? formatMoney(moneyValue(nextValue(lines, subtotalIndex) ?? undefined) ?? 0) : null),
+    subtotal:
+      subtotalIndex === null
+        ? null
+        : moneyValue(nextValue(lines, subtotalIndex) ?? undefined) !== null
+          ? formatMoney(moneyValue(nextValue(lines, subtotalIndex) ?? undefined) ?? 0)
+          : null,
     total: formatMoney(moneyValue(nextValue(lines, totalIndex) ?? undefined) ?? canonical.total),
     taxes: parseTaxes(lines, taxStart, sectionEnd),
     payments: parsePayments(lines),
