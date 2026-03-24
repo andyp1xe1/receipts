@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import type { ParsedReceipt } from '$lib/types';
-import { listReceiptsForExport } from '$lib/server/db';
-import { readExportFilters } from '$lib/server/export';
+import { listReceiptsForExport } from '$lib/server/db/receipts';
+import { readExportFilters } from '$lib/server/export/export';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -32,13 +32,13 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       theme: 'plain',
       head: [['Date', 'Merchant / Item', 'Receipt #', 'Category', 'Qty', 'Total (MDL)']],
       body: receipts.flatMap((receipt) => {
-        const parsed = JSON.parse(receipt.raw_json) as ParsedReceipt;
+        const parsed = JSON.parse(receipt.rawJson) as ParsedReceipt;
 
         return [
           [
-            receipt.url_date,
-            `${receipt.merchant_name}${receipt.note ? `\n${receipt.note}` : ''}`,
-            receipt.url_receipt_number,
+            receipt.urlDate,
+            `${receipt.merchantName}${receipt.note ? `\n${receipt.note}` : ''}`,
+            receipt.urlReceiptNumber,
             receipt.category || 'Unsorted',
             '',
             Number(receipt.total).toFixed(2)
@@ -95,9 +95,9 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       theme: 'plain',
       head: [['Date', 'Merchant', 'Receipt #', 'Category', 'Total (MDL)']],
       body: receipts.map((receipt) => [
-        receipt.url_date,
-        receipt.merchant_name,
-        receipt.url_receipt_number,
+        receipt.urlDate,
+        receipt.merchantName,
+        receipt.urlReceiptNumber,
         receipt.category || 'Unsorted',
         Number(receipt.total).toFixed(2)
       ]),

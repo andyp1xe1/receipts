@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
-import { countReceipts } from '$lib/server/db';
-import { readExportFilters } from '$lib/server/export';
+import { countReceipts } from '$lib/server/db/receipts';
+import { readExportFilters } from '$lib/server/export/export';
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   const filters = readExportFilters(url);

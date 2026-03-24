@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import type { ParsedReceipt } from '$lib/types';
-import { readExportFilters } from '$lib/server/export';
-import { listReceiptsForExport } from '$lib/server/db';
+import { readExportFilters } from '$lib/server/export/export';
+import { listReceiptsForExport } from '$lib/server/db/receipts';
 
 function escapeCsv(value: string): string {
   if (/[",\r\n]/.test(value)) {
@@ -36,7 +36,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
   const lines = [headers.map(escapeCsv).join(',')];
 
   for (const receipt of receipts) {
-    const parsed = JSON.parse(receipt.raw_json) as ParsedReceipt;
+    const parsed = JSON.parse(receipt.rawJson) as ParsedReceipt;
     const otherPayments = Object.entries(parsed.payments.other)
       .map(([label, amount]) => `${label}: ${amount.toFixed(2)}`)
       .join(' | ');
@@ -46,12 +46,12 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 
     lines.push(
       [
-        receipt.url_date,
-        receipt.issued_at || '',
-        receipt.merchant_name,
-        receipt.merchant_tax_id || '',
-        receipt.ecc_id,
-        receipt.url_receipt_number,
+        receipt.urlDate,
+        receipt.issuedAt || '',
+        receipt.merchantName,
+        receipt.merchantTaxId || '',
+        receipt.eccId,
+        receipt.urlReceiptNumber,
         receipt.category || 'Unsorted',
         receipt.total,
         parsed.subtotal || '',
@@ -62,7 +62,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
         String(parsed.items.length),
         items,
         receipt.note || '',
-        receipt.source_url
+        receipt.sourceUrl
       ]
         .map(escapeCsv)
         .join(',')

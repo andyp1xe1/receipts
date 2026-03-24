@@ -155,10 +155,24 @@
 <div class="app-shell">
   <header class="app-header">
     <h1 class="app-title">Receipt Ledger</h1>
-    <div class="header-actions"><div class="status-note">{data.stats.receiptCount} receipts</div></div>
+    <div class="header-actions">
+      <div class="status-note">{data.stats.receiptCount} receipts</div>
+      {#if data.user}
+        <a class="button-ghost" href="/settings/security">Security</a>
+        <form method="POST" action="/logout">
+          <button class="button-ghost" type="submit">Sign out</button>
+        </form>
+      {/if}
+    </div>
   </header>
 
   <div class="dashboard stack">
+    {#if data.user && !data.user.twoFactorEnabled}
+      <div class="alert compact">
+        Two-factor authentication is off. <a href="/settings/security">Set it up now</a> before adding more data.
+      </div>
+    {/if}
+
     <!-- Import bar -->
     <form method="POST" action="?/ingest" class="import-bar">
       <input
@@ -357,14 +371,14 @@
           {#each data.receipts as receipt}
             <a class="receipt-row" href={`/receipts/${receipt.id}`}>
               <div>
-                <h3 class="receipt-name">{receipt.merchant_name}</h3>
-                <div class="meta-row detail-meta">
-                  <span>{formatDateTime(receipt.issued_at)}</span>
-                  <span>{receipt.category || 'Unsorted'}</span>
-                  <span>ECC {receipt.ecc_id}</span>
-                  <span>#{receipt.url_receipt_number}</span>
-                </div>
-              </div>
+                 <h3 class="receipt-name">{receipt.merchantName}</h3>
+                 <div class="meta-row detail-meta">
+                   <span>{formatDateTime(receipt.issuedAt)}</span>
+                   <span>{receipt.category || 'Unsorted'}</span>
+                   <span>ECC {receipt.eccId}</span>
+                   <span>#{receipt.urlReceiptNumber}</span>
+                 </div>
+               </div>
               <div class="amount">{formatCurrency(receipt.total)}</div>
             </a>
           {/each}

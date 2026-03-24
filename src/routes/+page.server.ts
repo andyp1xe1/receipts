@@ -1,14 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import {
-  getDashboardStats,
-  getEnhancedStats,
-  getExistingReceiptByCanonicalKey,
-  insertReceipt,
-  listReceiptCategories,
-  listReceipts
-} from '$lib/server/db';
-import { fetchAndParseReceipt } from '$lib/server/mev';
+import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptCategories, listReceipts } from '$lib/server/db/receipts';
+import { getDashboardStats, getEnhancedStats } from '$lib/server/db/stats';
+import { fetchAndParseReceipt } from '$lib/server/mev/mev';
 import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 
 export const load: PageServerLoad = async ({ platform, url }) => {

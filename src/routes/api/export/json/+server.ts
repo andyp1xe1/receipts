@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import type { ParsedReceipt } from '$lib/types';
-import { listReceiptsForExport } from '$lib/server/db';
-import { readExportFilters } from '$lib/server/export';
+import { listReceiptsForExport } from '$lib/server/db/receipts';
+import { readExportFilters } from '$lib/server/export/export';
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   const filters = readExportFilters(url);
@@ -18,29 +18,29 @@ export const GET: RequestHandler = async ({ platform, url }) => {
     },
     count: receipts.length,
     receipts: receipts.map((r) => {
-      const parsed = JSON.parse(r.raw_json) as ParsedReceipt;
+      const parsed = JSON.parse(r.rawJson) as ParsedReceipt;
 
       return {
         id: r.id,
-        sourceUrl: r.source_url,
+        sourceUrl: r.sourceUrl,
         canonicalKey: {
-          eccId: r.ecc_id,
-          urlTotal: r.url_total,
-          urlReceiptNumber: r.url_receipt_number,
-          urlDate: r.url_date
+          eccId: r.eccId,
+          urlTotal: r.urlTotal,
+          urlReceiptNumber: r.urlReceiptNumber,
+          urlDate: r.urlDate
         },
-        date: r.url_date,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-        merchantName: r.merchant_name,
-        merchantTaxId: r.merchant_tax_id,
-        receiptNumber: r.url_receipt_number,
-        eccId: r.ecc_id,
+        date: r.urlDate,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        merchantName: r.merchantName,
+        merchantTaxId: r.merchantTaxId,
+        receiptNumber: r.urlReceiptNumber,
+        eccId: r.eccId,
         total: r.total,
         subtotal: parsed.subtotal,
         category: r.category || 'Unsorted',
         note: r.note,
-        issuedAt: r.issued_at,
+        issuedAt: r.issuedAt,
         printedNumber: parsed.printedNumber,
         deviceNumber: parsed.deviceNumber,
         merchant: parsed.merchant,
