@@ -78,5 +78,3 @@ Deploy with:
 ```bash
 bun run deploy
 ```
-
-The parser and invariants now live entirely in the TypeScript app and Vitest suite.

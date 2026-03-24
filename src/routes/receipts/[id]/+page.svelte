@@ -116,7 +116,7 @@
           <div class="panel-header">
             <h3 class="panel-title">Source details</h3>
           </div>
-          <div class="panel-body stack" style="gap: 10px;">
+          <div class="panel-body stack-sm">
             <div class="meta-grid">
               <div class="meta-label">Source URL</div>
               <div class="meta-value">{receipt.sourceUrl}</div>
