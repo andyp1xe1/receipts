@@ -2,6 +2,7 @@ node_modules/
 .svelte-kit/
 .wrangler/
 .dev.vars
+wrangler.private.jsonc
 .claude/
 .junie/
 skills-lock.json
