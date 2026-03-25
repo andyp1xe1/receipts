@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { deleteReceipt, getReceiptById, updateReceiptMetadata } from '$lib/server/db/receipts';
+import { getFormString } from '$lib/server/forms';
 
 export const load: PageServerLoad = async ({ params, platform, url }) => {
   const receipt = await getReceiptById(platform, params.id);
@@ -18,8 +19,8 @@ export const load: PageServerLoad = async ({ params, platform, url }) => {
 export const actions: Actions = {
   save: async ({ request, platform, params }) => {
     const formData = await request.formData();
-    const category = String(formData.get('category') ?? '').trim() || null;
-    const note = String(formData.get('note') ?? '').trim() || null;
+    const category = getFormString(formData, 'category').trim() || null;
+    const note = getFormString(formData, 'note').trim() || null;
 
     await updateReceiptMetadata(platform, {
       id: params.id,
@@ -36,7 +37,7 @@ export const actions: Actions = {
   delete: async ({ platform, params }) => {
     try {
       await deleteReceipt(platform, params.id);
-    } catch (error) {
+    } catch {
       return fail(400, {
         type: 'error',
         message: 'Could not delete the receipt.'

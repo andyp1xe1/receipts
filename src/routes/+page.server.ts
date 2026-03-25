@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptCategories, listReceipts } from '$lib/server/db/receipts';
 import { getDashboardStats, getEnhancedStats } from '$lib/server/db/stats';
+import { getFormString } from '$lib/server/forms';
 import { fetchAndParseReceipt } from '$lib/server/mev/mev';
 import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 
@@ -37,9 +38,9 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 export const actions: Actions = {
   ingest: async ({ request, platform }) => {
     const formData = await request.formData();
-    const sourceUrl = String(formData.get('source_url') ?? '').trim();
-    const category = String(formData.get('category') ?? '').trim() || null;
-    const note = String(formData.get('note') ?? '').trim() || null;
+    const sourceUrl = getFormString(formData, 'source_url').trim();
+    const category = getFormString(formData, 'category').trim() || null;
+    const note = getFormString(formData, 'note').trim() || null;
     const values = {
       source_url: sourceUrl,
       category: category ?? '',

@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createAuth, getSetupToken } from '$lib/server/auth/auth';
 import { authErrorMessage, isHttpControlFlow } from '$lib/server/auth/errors';
+import { getFormString } from '$lib/server/forms';
 
 export const load: PageServerLoad = async ({ locals, platform, request, url }) => {
   if (locals.authSetupComplete) {
@@ -40,10 +41,10 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const name = String(formData.get('name') ?? '').trim();
-    const email = String(formData.get('email') ?? '').trim().toLowerCase();
-    const password = String(formData.get('password') ?? '');
-    const providedSetupToken = String(formData.get('setup_token') ?? '');
+    const name = getFormString(formData, 'name').trim();
+    const email = getFormString(formData, 'email').trim().toLowerCase();
+    const password = getFormString(formData, 'password');
+    const providedSetupToken = getFormString(formData, 'setup_token');
 
     if (!name || !email || !password || !providedSetupToken) {
       return fail(400, {

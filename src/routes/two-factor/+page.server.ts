@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createAuth } from '$lib/server/auth/auth';
 import { authErrorMessage, isHttpControlFlow } from '$lib/server/auth/errors';
+import { getFormString } from '$lib/server/forms';
 
 function hasPendingTwoFactorChallenge(cookies: Parameters<PageServerLoad>[0]['cookies']): boolean {
   return Boolean(cookies.get('better-auth.two_factor') || cookies.get('__Secure-better-auth.two_factor'));
@@ -26,7 +27,7 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const code = String(formData.get('code') ?? '').trim();
+    const code = getFormString(formData, 'code').trim();
     const trustDevice = formData.get('trust_device') === 'on';
 
     if (!code) {
@@ -59,7 +60,7 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const code = String(formData.get('backup_code') ?? '').trim();
+    const code = getFormString(formData, 'backup_code').trim();
     const trustDevice = formData.get('backup_trust_device') === 'on';
 
     if (!code) {

@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node", "vitest"],
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": [
+    ".svelte-kit/**",
+    ".wrangler/**",
+    ".localflare/**",
+    "node_modules/**"
+  ],
+  "settings": {
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "rules": {
+    "no-control-regex": "off"
+  }
+}

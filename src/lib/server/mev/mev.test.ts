@@ -94,7 +94,7 @@ describe('parseReceiptText', () => {
   it('renders ASCII-only thermal output', () => {
     const receipt = parseReceiptText(sampleText, sourceUrl);
 
-    expect([...receipt.asciiReceipt].every((char) => char.charCodeAt(0) < 128)).toBe(true);
+    expect(/^[\x00-\x7F]*$/.test(receipt.asciiReceipt)).toBe(true);
     expect(receipt.asciiReceipt).toContain('DEMO MARKET SRL');
     expect(receipt.asciiReceipt).toContain('NUMARUL DE INREGISTRARE: FAKEECC001');
     expect(receipt.asciiReceipt).toContain('ID BON');
