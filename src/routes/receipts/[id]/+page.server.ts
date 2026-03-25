@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { deleteReceipt, getReceiptById, updateReceiptMetadata } from '$lib/server/db';
+import { deleteReceipt, getReceiptById, updateReceiptMetadata } from '$lib/server/db/receipts';
 
 export const load: PageServerLoad = async ({ params, platform, url }) => {
   const receipt = await getReceiptById(platform, params.id);

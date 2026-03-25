@@ -47,20 +47,20 @@ export interface ParsedReceipt {
 
 export interface ReceiptRecord {
   id: string;
-  source_url: string;
-  ecc_id: string;
-  url_total: string;
-  url_receipt_number: string;
-  url_date: string;
-  merchant_name: string;
-  merchant_tax_id: string | null;
-  issued_at: string | null;
+  sourceUrl: string;
+  eccId: string;
+  urlTotal: string;
+  urlReceiptNumber: string;
+  urlDate: string;
+  merchantName: string;
+  merchantTaxId: string | null;
+  issuedAt: string | null;
   total: string;
   category: string | null;
   note: string | null;
-  raw_json: string;
-  created_at: string;
-  updated_at: string;
+  rawJson: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ReceiptSummary extends ReceiptRecord {

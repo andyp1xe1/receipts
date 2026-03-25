@@ -1,8 +1,12 @@
 import type { RequestHandler } from './$types';
-import { countReceipts } from '$lib/server/db';
-import { readExportFilters } from '$lib/server/export';
+import { countReceipts } from '$lib/server/db/receipts';
+import { readExportFilters } from '$lib/server/export/export';
 
-export const GET: RequestHandler = async ({ platform, url }) => {
+export const GET: RequestHandler = async ({ locals, platform, url }) => {
+  if (!locals.user) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const filters = readExportFilters(url);
   const total = await countReceipts(platform, filters);
   const limited = typeof filters.limit === 'number' ? Math.min(total, filters.limit) : total;

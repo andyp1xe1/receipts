@@ -155,10 +155,24 @@
 <div class="app-shell">
   <header class="app-header">
     <h1 class="app-title">Receipt Ledger</h1>
-    <div class="header-actions"><div class="status-note">{data.stats.receiptCount} receipts</div></div>
+    <div class="header-actions">
+      <div class="status-note">{data.stats.receiptCount} receipts</div>
+      {#if data.user}
+        <a class="button-ghost" href="/settings/security">Security</a>
+        <form method="POST" action="/logout">
+          <button class="button-ghost" type="submit">Sign out</button>
+        </form>
+      {/if}
+    </div>
   </header>
 
   <div class="dashboard stack">
+    {#if data.user && !data.user.twoFactorEnabled}
+      <div class="alert compact">
+        Two-factor authentication is off. <a href="/settings/security">Set it up now</a> before adding more data.
+      </div>
+    {/if}
+
     <!-- Import bar -->
     <form method="POST" action="?/ingest" class="import-bar">
       <input
@@ -178,200 +192,205 @@
       <div class={`alert compact ${form.type === 'error' ? 'error' : 'success'}`}>{form.message}</div>
     {/if}
 
-    <!-- Summary cards -->
-    <section class="summary-grid">
-      <div class="summary-card">
-        <div class="summary-label">Saved receipts</div>
-        <div class="summary-value">{data.stats.receiptCount}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Tracked spend</div>
-        <div class="summary-value">{formatCurrency(data.stats.totalSpend)}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">This month</div>
-        <div class="summary-value">{formatCurrency(currentMonthTotal)}</div>
-      </div>
-    </section>
+    <!-- Inline filters -->
+    <div class="ledger-layout">
+      <aside class="ledger-sidebar stack">
+        <details class="panel export-panel">
+          <summary class="export-summary">
+            <span>Export receipts</span>
+            <span class="export-summary-value">
+              {#if exportScope === 'current'}
+                Current view
+              {:else if exportScope === 'custom'}
+                Custom range
+              {:else}
+                All receipts
+              {/if}
+            </span>
+          </summary>
 
-    <!-- Stats strip -->
-    {#if data.enhancedStats.periodTotals.length || data.stats.topCategories.length}
-      <div class="stats-strip">
-        <div class="stats-group">
-          <div class="stats-group-header">
-            <div class="period-tabs">
-              {#each ['weekly', 'monthly', 'yearly'] as p}
-                <a class={`period-tab ${data.period === p ? 'active' : ''}`} href={periodTabUrl(p)}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </a>
-              {/each}
+          <div class="export-panel-body stack-sm">
+            <div class="export-grid">
+              <label class="field">
+                <span class="label">Range</span>
+                <select class="select" bind:value={exportScope}>
+                  <option value="all">All receipts</option>
+                  <option value="current">Current page filters</option>
+                  <option value="custom">Custom dates</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="label">Max receipts</span>
+                <select class="select" bind:value={exportLimit}>
+                  <option value="all">All matches</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                  <option value="500">500</option>
+                  <option value="1000">1000</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="label">From</span>
+                <input
+                  class="input"
+                  type="date"
+                  bind:value={exportFrom}
+                  onfocus={useCustomScope}
+                  onchange={useCustomScope}
+                />
+              </label>
+
+              <label class="field">
+                <span class="label">To</span>
+                <input
+                  class="input"
+                  type="date"
+                  bind:value={exportTo}
+                  onfocus={useCustomScope}
+                  onchange={useCustomScope}
+                />
+              </label>
+
+              <label class="field export-grid-wide">
+                <span class="label">Category</span>
+                <select class="select" bind:value={exportCategory} onchange={useCustomScope}>
+                  <option value="">All categories</option>
+                  <option value="__unsorted__">Unsorted</option>
+                  {#each data.exportCategories.filter((category) => category !== 'Unsorted') as category}
+                    <option value={category}>{category}</option>
+                  {/each}
+                </select>
+              </label>
+            </div>
+
+            <div class="export-meta-row">
+              {#if exportScope === 'current'}
+                <div class="export-note">Current filters: {currentFiltersLabel()}</div>
+              {/if}
+              <div class="export-note">{previewLabel()}</div>
+            </div>
+
+            <div class="export-actions">
+              <a class="button-secondary export-link" href={exportUrl('csv')}>Download CSV</a>
+              <a class="button-secondary export-link" href={exportUrl('json')}>Download full JSON</a>
+              <a class="button-secondary export-link" href={exportUrl('pdf')}>Download PDF compact</a>
+              <a class="button-secondary export-link" href={exportUrl('pdf', { pdfMode: 'full' })}>Download PDF full</a>
             </div>
           </div>
-          {#each data.enhancedStats.periodTotals.slice(0, 6) as entry}
-            <div class="stat-row">
-              <span class="stat-label">{formatPeriodLabel(data.enhancedStats.period, entry.period)}</span>
-              <div class="stat-bar-track">
-                <div class="stat-bar-fill" style={`width:${maxPeriodTotal ? (entry.total / maxPeriodTotal) * 100 : 0}%`}></div>
-              </div>
-              <span class="stat-value">{formatCurrency(entry.total)}</span>
+        </details>
+
+        {#if data.enhancedStats.periodTotals.length || data.stats.topCategories.length}
+          <section class="summary-grid-stacked">
+            <div class="summary-card">
+              <div class="summary-label">Tracked spend</div>
+              <div class="summary-value">{formatCurrency(data.stats.totalSpend)}</div>
             </div>
-          {/each}
-        </div>
-        {#if data.stats.topCategories.length}
+            <div class="summary-card">
+              <div class="summary-label">This month</div>
+              <div class="summary-value">{formatCurrency(currentMonthTotal)}</div>
+            </div>
+          </section>
+
           <div class="stats-group">
-            <div class="stats-group-label">Categories</div>
-            {#each data.stats.topCategories.slice(0, 4) as cat}
+            <div class="stats-group-header">
+              <div class="period-tabs">
+                {#each ['weekly', 'monthly', 'yearly'] as p}
+                  <a class={`period-tab ${data.period === p ? 'active' : ''}`} href={periodTabUrl(p)}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </a>
+                {/each}
+              </div>
+            </div>
+            {#each data.enhancedStats.periodTotals.slice(0, 6) as entry}
               <div class="stat-row">
-                <span class="stat-label">{cat.category}</span>
+                <span class="stat-label">{formatPeriodLabel(data.enhancedStats.period, entry.period)}</span>
                 <div class="stat-bar-track">
-                  <div class="stat-bar-fill" style={`width:${maxCategoryTotal ? (cat.total / maxCategoryTotal) * 100 : 0}%`}></div>
+                  <div class="stat-bar-fill" style={`width:${maxPeriodTotal ? (entry.total / maxPeriodTotal) * 100 : 0}%`}></div>
                 </div>
-                <span class="stat-value">{formatCurrency(cat.total)}</span>
+                <span class="stat-value">{formatCurrency(entry.total)}</span>
               </div>
             {/each}
           </div>
-        {/if}
-      </div>
-    {/if}
 
-    <!-- Inline filters -->
-    <div class="filter-row">
-      <a
-        class={`tab-link ${!data.month ? 'active' : ''}`}
-        href={data.category ? `/?${new URLSearchParams({ category: data.category }).toString()}` : '/'}
-      >
-        All
-      </a>
-      {#each data.stats.monthlySpend.slice().reverse() as month}
-        <a
-          class={`tab-link ${data.month === month.month ? 'active' : ''}`}
-          href={`/?${new URLSearchParams({ month: month.month, ...(data.category ? { category: data.category } : {}) }).toString()}`}
-        >
-          {formatMonthLabel(month.month)}
-        </a>
-      {/each}
-
-      <span class="filter-divider"></span>
-
-      <a class={`tab-link ${!data.category ? 'active' : ''}`} href={data.month ? `/?month=${data.month}` : '/'}>All</a>
-      {#each data.categories as category}
-        <a
-          class={`tab-link ${slugCategory(data.category) === slugCategory(category) ? 'active' : ''}`}
-          href={`/?${new URLSearchParams({ ...(data.month ? { month: data.month } : {}), category: category === 'Unsorted' ? '__unsorted__' : category }).toString()}`}
-        >
-          {category}
-        </a>
-      {/each}
-    </div>
-
-    <details class="panel export-panel">
-      <summary class="export-summary">
-        <span>Export receipts</span>
-        <span class="export-summary-value">
-          {#if exportScope === 'current'}
-            Current view
-          {:else if exportScope === 'custom'}
-            Custom range
-          {:else}
-            All receipts
-          {/if}
-        </span>
-      </summary>
-
-      <div class="export-panel-body stack-sm">
-        <div class="export-grid">
-          <label class="field">
-            <span class="label">Range</span>
-            <select class="select" bind:value={exportScope}>
-              <option value="all">All receipts</option>
-              <option value="current">Current page filters</option>
-              <option value="custom">Custom dates</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span class="label">Max receipts</span>
-            <select class="select" bind:value={exportLimit}>
-              <option value="all">All matches</option>
-              <option value="100">100</option>
-              <option value="250">250</option>
-              <option value="500">500</option>
-              <option value="1000">1000</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span class="label">From</span>
-            <input
-              class="input"
-              type="date"
-              bind:value={exportFrom}
-              onfocus={useCustomScope}
-              onchange={useCustomScope}
-            />
-          </label>
-
-          <label class="field">
-            <span class="label">To</span>
-            <input
-              class="input"
-              type="date"
-              bind:value={exportTo}
-              onfocus={useCustomScope}
-              onchange={useCustomScope}
-            />
-          </label>
-
-          <label class="field export-grid-wide">
-            <span class="label">Category</span>
-            <select class="select" bind:value={exportCategory} onchange={useCustomScope}>
-              <option value="">All categories</option>
-              <option value="__unsorted__">Unsorted</option>
-              {#each data.exportCategories.filter((category) => category !== 'Unsorted') as category}
-                <option value={category}>{category}</option>
-              {/each}
-            </select>
-          </label>
-        </div>
-
-        <div class="export-meta-row">
-          {#if exportScope === 'current'}
-            <div class="export-note">Current filters: {currentFiltersLabel()}</div>
-          {/if}
-          <div class="export-note">{previewLabel()}</div>
-        </div>
-
-        <div class="export-actions">
-          <a class="button-secondary export-link" href={exportUrl('csv')}>Download CSV</a>
-          <a class="button-secondary export-link" href={exportUrl('json')}>Download full JSON</a>
-          <a class="button-secondary export-link" href={exportUrl('pdf')}>Download PDF compact</a>
-          <a class="button-secondary export-link" href={exportUrl('pdf', { pdfMode: 'full' })}>Download PDF full</a>
-        </div>
-      </div>
-    </details>
-
-    <!-- Ledger -->
-    <section class="panel">
-      <div class="receipt-list">
-        {#if data.receipts.length}
-          {#each data.receipts as receipt}
-            <a class="receipt-row" href={`/receipts/${receipt.id}`}>
-              <div>
-                <h3 class="receipt-name">{receipt.merchant_name}</h3>
-                <div class="meta-row detail-meta">
-                  <span>{formatDateTime(receipt.issued_at)}</span>
-                  <span>{receipt.category || 'Unsorted'}</span>
-                  <span>ECC {receipt.ecc_id}</span>
-                  <span>#{receipt.url_receipt_number}</span>
+          {#if data.stats.topCategories.length}
+            <div class="stats-group">
+              <div class="stats-group-label">Categories</div>
+              {#each data.stats.topCategories.slice(0, 4) as cat}
+                <div class="stat-row">
+                  <span class="stat-label">{cat.category}</span>
+                  <div class="stat-bar-track">
+                    <div class="stat-bar-fill" style={`width:${maxCategoryTotal ? (cat.total / maxCategoryTotal) * 100 : 0}%`}></div>
+                  </div>
+                  <span class="stat-value">{formatCurrency(cat.total)}</span>
                 </div>
-              </div>
-              <div class="amount">{formatCurrency(receipt.total)}</div>
-            </a>
-          {/each}
-        {:else}
-          <div class="empty-state">Paste your first MEV URL to start the ledger.</div>
+              {/each}
+            </div>
+          {/if}
         {/if}
+      </aside>
+
+      <div class="ledger-main stack">
+        <div class="filter-group">
+          <span class="filter-label">Month</span>
+          <div class="filter-row">
+            <a
+              class={`tab-link ${!data.month ? 'active' : ''}`}
+              href={data.category ? `/?${new URLSearchParams({ category: data.category }).toString()}` : '/'}
+            >
+              All
+            </a>
+            {#each data.stats.monthlySpend.slice().reverse() as month}
+              <a
+                class={`tab-link ${data.month === month.month ? 'active' : ''}`}
+                href={`/?${new URLSearchParams({ month: month.month, ...(data.category ? { category: data.category } : {}) }).toString()}`}
+              >
+                {formatMonthLabel(month.month)}
+              </a>
+            {/each}
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Category</span>
+          <div class="filter-row">
+            <a class={`tab-link ${!data.category ? 'active' : ''}`} href={data.month ? `/?month=${data.month}` : '/'}>All</a>
+            {#each data.categories as category}
+              <a
+                class={`tab-link ${slugCategory(data.category) === slugCategory(category) ? 'active' : ''}`}
+                href={`/?${new URLSearchParams({ ...(data.month ? { month: data.month } : {}), category: category === 'Unsorted' ? '__unsorted__' : category }).toString()}`}
+              >
+                {category}
+              </a>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Ledger -->
+        <section class="panel">
+          <div class="receipt-list">
+            {#if data.receipts.length}
+              {#each data.receipts as receipt}
+                <a class="receipt-row" href={`/receipts/${receipt.id}`}>
+                  <div>
+                     <h3 class="receipt-name">{receipt.merchantName}</h3>
+                     <div class="meta-row detail-meta">
+                       <span>{formatDateTime(receipt.issuedAt)}</span>
+                       <span>{receipt.category || 'Unsorted'}</span>
+                       <span>ECC {receipt.eccId}</span>
+                       <span>#{receipt.urlReceiptNumber}</span>
+                     </div>
+                   </div>
+                  <div class="amount">{formatCurrency(receipt.total)}</div>
+                </a>
+              {/each}
+            {:else}
+              <div class="empty-state">Paste your first MEV URL to start the ledger.</div>
+            {/if}
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   </div>
 </div>

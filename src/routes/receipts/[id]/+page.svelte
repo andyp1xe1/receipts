@@ -7,8 +7,8 @@
 </script>
 
 <svelte:head>
-  <title>{receipt.merchant_name} - Receipt Ledger</title>
-  <meta name="description" content={`Receipt detail for ${receipt.merchant_name}.`} />
+  <title>{receipt.merchantName} - Receipt Ledger</title>
+  <meta name="description" content={`Receipt detail for ${receipt.merchantName}.`} />
 </svelte:head>
 
 <div class="app-shell">
@@ -16,6 +16,10 @@
     <h1 class="app-title">Receipt Ledger</h1>
     <div class="header-actions">
       <a class="button-ghost" href="/">Back to ledger</a>
+      <a class="button-ghost" href="/settings/security">Security</a>
+      <form method="POST" action="/logout">
+        <button class="button-ghost" type="submit">Sign out</button>
+      </form>
     </div>
   </header>
 
@@ -37,11 +41,11 @@
         <div class="panel-body">
           <div class="detail-header">
             <div>
-              <h2 class="detail-title">{receipt.merchant_name}</h2>
+              <h2 class="detail-title">{receipt.merchantName}</h2>
               <div class="meta-row detail-meta">
-                <span>{formatDateTime(receipt.issued_at)}</span>
-                <span>ECC {receipt.ecc_id}</span>
-                <span>Receipt #{receipt.url_receipt_number}</span>
+                <span>{formatDateTime(receipt.issuedAt)}</span>
+                <span>ECC {receipt.eccId}</span>
+                <span>Receipt #{receipt.urlReceiptNumber}</span>
               </div>
             </div>
             <div class="detail-total">{formatCurrency(receipt.total)}</div>
@@ -112,26 +116,26 @@
           <div class="panel-header">
             <h3 class="panel-title">Source details</h3>
           </div>
-          <div class="panel-body stack" style="gap: 10px;">
+          <div class="panel-body stack-sm">
             <div class="meta-grid">
               <div class="meta-label">Source URL</div>
-              <div class="meta-value">{receipt.source_url}</div>
+              <div class="meta-value">{receipt.sourceUrl}</div>
             </div>
             <div class="meta-grid">
               <div class="meta-label">ECC</div>
-              <div class="meta-value">{receipt.ecc_id}</div>
+              <div class="meta-value">{receipt.eccId}</div>
             </div>
             <div class="meta-grid">
               <div class="meta-label">URL total</div>
-              <div class="meta-value">{receipt.url_total}</div>
+              <div class="meta-value">{receipt.urlTotal}</div>
             </div>
             <div class="meta-grid">
               <div class="meta-label">Receipt number</div>
-              <div class="meta-value">{receipt.url_receipt_number}</div>
+              <div class="meta-value">{receipt.urlReceiptNumber}</div>
             </div>
             <div class="meta-grid">
               <div class="meta-label">Date</div>
-              <div class="meta-value">{receipt.url_date}</div>
+              <div class="meta-value">{receipt.urlDate}</div>
             </div>
           </div>
         </section>
