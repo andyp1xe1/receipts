@@ -1,118 +1,87 @@
-import { describe, expect, it } from 'vitest';
-import { parseReceiptText } from './mev';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const sourceUrl = 'https://mev.sfs.md/receipt-verifier/FAKEECC001/91.37/650321/2028-11-06';
-const opaqueSourceUrl = 'https://sift-mev.sfs.md/receipt/FAKE-OPAQUE-TOKEN';
+import { fetchAndParseReceipt, parseReceiptText } from './mev';
+import { syntheticReceiptCorpus, type SyntheticReceiptFixture } from './synthetic-corpus';
 
-const sampleText = `
-DEMO MARKET SRL
-COD FISCAL: 1234567890123
-mun. Exemplu, str. Test 1/1
-NUMARUL DE INREGISTRARE: FAKEECC001
+function requestUrl(input: RequestInfo | URL): string {
+  return typeof input === 'string' || input instanceof URL ? input.toString() : input.url;
+}
 
-Americano
-1.000 x 91.37
-91.37
+function assertReceiptMatchesFixture(fixture: SyntheticReceiptFixture) {
+  const receipt = parseReceiptText(fixture.body, fixture.sourceUrl);
 
-TOTAL
-91.37
-SUBTOTAL
-91.37
+  expect(receipt.merchant.name).toBe(fixture.expected.merchantName);
+  expect(receipt.merchant.taxId).toBe(fixture.expected.taxId);
+  expect(receipt.eccId).toBe(fixture.expected.eccId);
+  expect(receipt.urlTotal).toBe(fixture.expected.urlTotal);
+  expect(receipt.urlReceiptNumber).toBe(fixture.expected.urlReceiptNumber);
+  expect(receipt.urlDate).toBe(fixture.expected.urlDate);
+  expect(receipt.issuedAt).toBe(fixture.expected.issuedAt);
+  expect(receipt.printedNumber).toBe(fixture.expected.printedNumber);
+  expect(receipt.deviceNumber).toBe(fixture.expected.deviceNumber);
+  expect(receipt.total).toBe(fixture.expected.total);
+  expect(receipt.subtotal).toBe(fixture.expected.subtotal);
+  expect(receipt.items).toEqual(fixture.expected.items);
+  expect(receipt.payments.cashGiven).toBe(fixture.expected.payments.cashGiven);
+  expect(receipt.payments.card).toBe(fixture.expected.payments.card);
+  expect(receipt.payments.change).toBe(fixture.expected.payments.change);
+  expect(receipt.taxes.map((tax) => tax.label)).toEqual(fixture.expected.taxLabels);
 
-TVA _ 0.00%
-0.00
+  return receipt;
+}
 
-INTRODUS
-0.00
-CARD
-91.37
-REST
-0.00
-
-DATA 06.11.2028
-ORA 14:22:33
-BON FISCAL
-Nr: 0066
-NUMARUL FABRICARII
-DEMO00001
-
-0000650321
-`;
-
-const noSubtotalText = `
-S.C. EXEMPLU TEST S.R.L.
-COD FISCAL: 9876543210987
-mun.Chisinau, bd.Dacia, 47/7
-NUMARUL DE INREGISTRARE: FAKEECC003
-
-35828-Portocale . 1/
-1.168 x 23.00
-26.86 A
-35868-Mandarine 1/KG
-0.860 x 29.00
-24.94 A
-
-TOTAL
-51.80
-
-TVA A 20.00%
-8.63
-
-CARD
-51.80
-
-DATA 12.03.2026
-ORA 19:17:58
-BON FISCAL
-Nr: 0341
-NUMARUL FABRICARII
-70002454
-
-0000374307
-`;
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('parseReceiptText', () => {
-  it('extracts structured fields from a four-part URL receipt', () => {
-    const receipt = parseReceiptText(sampleText, sourceUrl);
+  for (const fixture of syntheticReceiptCorpus) {
+    it(`parses ${fixture.id}`, () => {
+      assertReceiptMatchesFixture(fixture);
+    });
+  }
 
-    expect(receipt.merchant.name).toBe('DEMO MARKET SRL');
-    expect(receipt.merchant.taxId).toBe('1234567890123');
-    expect(receipt.eccId).toBe('FAKEECC001');
-    expect(receipt.urlReceiptNumber).toBe('650321');
-    expect(receipt.urlTotal).toBe('91.37');
-    expect(receipt.urlDate).toBe('2028-11-06');
-    expect(receipt.printedNumber).toBe('0066');
-    expect(receipt.deviceNumber).toBe('DEMO00001');
-    expect(receipt.total).toBe('91.37');
-    expect(receipt.items).toHaveLength(1);
-    expect(receipt.items[0].name).toBe('Americano');
-    expect(receipt.items[0].quantity).toBe(1);
-    expect(receipt.items[0].unitPrice).toBe(91.37);
-    expect(receipt.issuedAt).toBe('2028-11-06T14:22:33');
+  it('renders ASCII-only thermal output for the synthetic corpus', () => {
+    for (const fixture of syntheticReceiptCorpus) {
+      const receipt = parseReceiptText(fixture.body, fixture.sourceUrl);
+
+      expect(/^[\x00-\x7F]*$/.test(receipt.asciiReceipt)).toBe(true);
+      expect(receipt.asciiReceipt).toContain(fixture.expected.merchantName);
+      expect(receipt.asciiReceipt).toContain(`NUMARUL DE INREGISTRARE: ${fixture.expected.eccId}`);
+      expect(receipt.asciiReceipt).toContain('ID BON');
+      expect(receipt.asciiReceipt).toContain('BON FISCAL');
+      expect(receipt.asciiReceipt).toContain('--------------------------------');
+    }
   });
+});
 
-  it('renders ASCII-only thermal output', () => {
-    const receipt = parseReceiptText(sampleText, sourceUrl);
+describe('fetchAndParseReceipt', () => {
+  it('falls back to the mirrored MEV host for receipt lookups', async () => {
+    const sourceUrl = 'https://sift-mev.sfs.md/receipt/SYNTHFOOD08/45.00/102374/2026-04-21';
+    const fallbackUrl = 'https://mev.sfs.md/receipt-verifier/SYNTHFOOD08/45.00/102374/2026-04-21';
+    const fixture = syntheticReceiptCorpus.find(({ id }) => id === 'terminal-snack-eight-percent');
 
-    expect(/^[\x00-\x7F]*$/.test(receipt.asciiReceipt)).toBe(true);
-    expect(receipt.asciiReceipt).toContain('DEMO MARKET SRL');
-    expect(receipt.asciiReceipt).toContain('NUMARUL DE INREGISTRARE: FAKEECC001');
-    expect(receipt.asciiReceipt).toContain('ID BON');
-    expect(receipt.asciiReceipt).toContain('SUBTOTAL');
-    expect(receipt.asciiReceipt).toContain('BON FISCAL');
-    expect(receipt.asciiReceipt).toContain('--------------------------------');
-  });
+    if (!fixture) {
+      throw new Error('Synthetic fixture missing: terminal-snack-eight-percent');
+    }
 
-  it('extracts the canonical tuple from opaque lookup receipts', () => {
-    const receipt = parseReceiptText(noSubtotalText, opaqueSourceUrl);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = requestUrl(input);
 
-    expect(receipt.eccId).toBe('FAKEECC003');
-    expect(receipt.urlTotal).toBe('51.80');
-    expect(receipt.urlReceiptNumber).toBe('374307');
-    expect(receipt.urlDate).toBe('2026-03-12');
-    expect(receipt.subtotal).toBeNull();
-    expect(receipt.items).toHaveLength(2);
-    expect(receipt.items[0].total).toBe(26.86);
-    expect(receipt.payments.card).toBe(51.8);
+      if (url === sourceUrl) {
+        return new Response('missing', { status: 404 });
+      }
+
+      if (url === fallbackUrl) {
+        return new Response(fixture.body, { status: 200 });
+      }
+
+      return new Response('unexpected', { status: 500 });
+    });
+
+    const receipt = await fetchAndParseReceipt(sourceUrl);
+
+    expect(receipt.eccId).toBe(fixture.expected.eccId);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

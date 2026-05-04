@@ -1,4 +1,4 @@
-# Receipt Ledger
+# [WIP] Receipt Ledger
 
 Receipt tracker for Moldova MEV receipts.
 
@@ -57,15 +57,15 @@ Then open `/setup` once, enter the bootstrap token, and create the single admin 
 - apply local migrations with `bun run db:migrate:local`
 - apply remote migrations with `bun run db:migrate:remote`
 
-## Private live parser tests
+## Parser test corpora
 
-Concrete MEV receipt URLs stay out of git.
-
-- Put a private corpus in `tests/private/receipt_urls.json` or `tests/private/receipt_urls.local.json`
+- The committed synthetic parser corpus lives in `src/lib/server/mev/synthetic-corpus.ts`
+- The normal suite uses that synthetic corpus with mocked fetch responses via `bun run test`
+- Concrete live MEV receipt URLs stay out of git and remain optional
+- Put a private live corpus in `tests/private/receipt_urls.json` or `tests/private/receipt_urls.local.json`
 - Or set `MEV_PRIVATE_RECEIPT_LIST=/absolute/path/to/receipt_urls.json`
 - Use `tests/receipt_urls.example.json` as the shape reference
-
-Run the normal suite with `bun run test` or only the live invariant suite with `bun run test:mev-live`.
+- Run only the live invariant suite with `bun run test:mev-live`
 
 ## Production
 
