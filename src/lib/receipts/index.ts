@@ -25,7 +25,7 @@ export {
 } from './ingest';
 export { distinctCategories, matchesFilters } from './filters';
 export { formField, localOr } from './forms';
-export { parseReceiptRecord } from './record';
+export { isManual, parseReceiptRecord } from './record';
 export {
   useReceipt,
   useReceipts,
