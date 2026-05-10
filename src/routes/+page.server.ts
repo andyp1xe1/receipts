@@ -1,5 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { createAuth } from '$lib/server/auth/auth';
+import { clearLocalSession, hasLocalSession } from '$lib/server/auth/local-session';
 import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptsForExport } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
 import { fetchAndParseReceipt } from '$lib/server/mev/mev';
@@ -67,5 +69,16 @@ export const actions: Actions = {
     }
 
     throw redirect(303, destination);
+  },
+
+  logout: async (event) => {
+    if (hasLocalSession(event.cookies)) {
+      clearLocalSession(event.cookies);
+    } else if (event.locals.authTablesReady) {
+      await createAuth(event).api.signOut({
+        headers: event.request.headers
+      });
+    }
+    throw redirect(303, '/login');
   }
 };

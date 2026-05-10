@@ -222,7 +222,7 @@
         <a class="button-ghost" href="/settings/security">Security</a>
       {/if}
       {#if data.user}
-        <form method="POST" action="/logout">
+        <form method="POST" action="/?/logout">
           <button class="button-ghost" type="submit">Sign out</button>
         </form>
       {/if}

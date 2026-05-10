@@ -69,7 +69,7 @@
       {#if data.kind === 'remote'}
         <a class="button-ghost" href="/settings/security">Security</a>
       {/if}
-      <form method="POST" action="/logout">
+      <form method="POST" action="/?/logout">
         <button class="button-ghost" type="submit">Sign out</button>
       </form>
     </div>

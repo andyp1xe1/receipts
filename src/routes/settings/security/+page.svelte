@@ -25,7 +25,7 @@
     <h1 class="app-title">Security</h1>
     <div class="header-actions">
       <a class="button-ghost" href="/">Back to ledger</a>
-      <form method="POST" action="/logout">
+      <form method="POST" action="/?/logout">
         <button class="button-ghost" type="submit">Sign out</button>
       </form>
     </div>
