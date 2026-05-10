@@ -1,14 +1,64 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { applyAction, enhance } from '$app/forms';
+  import * as localStore from '$lib/local-store';
+  import type { ParsedReceipt, ReceiptRecord, ReceiptSummary } from '$lib/types';
   import { formatCurrency, formatDateTime } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
-  const receipt = $derived(data.receipt);
+
+  let localRecord = $state<ReceiptRecord | null>(null);
+  let localFlash = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  function loadLocal(id: string) {
+    localRecord = localStore.get(id);
+    if (!localRecord && browser) goto('/', { invalidateAll: true });
+  }
+
+  $effect(() => {
+    if (data.kind !== 'local' || !browser) return;
+    loadLocal(data.id);
+    const onStorage = (event: StorageEvent) => {
+      if ((event.key === null || event.key === 'receipts.records.v1') && data.kind === 'local') {
+        loadLocal(data.id);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  });
+
+  function asSummary(record: ReceiptRecord): ReceiptSummary {
+    return { ...record, parsed: JSON.parse(record.rawJson) as ParsedReceipt };
+  }
+
+  const receipt = $derived.by<ReceiptSummary | null>(() => {
+    if (data.kind === 'remote') return data.receipt;
+    return localRecord ? asSummary(localRecord) : null;
+  });
+
+  function handleLocalSave(formData: FormData) {
+    if (data.kind !== 'local') return;
+    const category = (formData.get('category')?.toString() ?? '').trim() || null;
+    const note = (formData.get('note')?.toString() ?? '').trim() || null;
+    localStore.updateMetadata(data.id, { category, note });
+    loadLocal(data.id);
+    localFlash = { type: 'success', message: 'Metadata saved.' };
+  }
+
+  function handleLocalDelete() {
+    if (data.kind !== 'local') return;
+    localStore.remove(data.id);
+    goto('/', { invalidateAll: true });
+  }
+
+  const flash = $derived(localFlash ?? (form ? { type: form.type, message: form.message } : null));
 </script>
 
 <svelte:head>
-  <title>{receipt.merchantName} - Receipt Ledger</title>
-  <meta name="description" content={`Receipt detail for ${receipt.merchantName}.`} />
+  <title>{receipt?.merchantName ?? 'Receipt'} - Receipt Ledger</title>
+  <meta name="description" content={`Receipt detail${receipt ? ` for ${receipt.merchantName}` : ''}.`} />
 </svelte:head>
 
 <div class="app-shell">
@@ -16,162 +66,203 @@
     <h1 class="app-title">Receipt Ledger</h1>
     <div class="header-actions">
       <a class="button-ghost" href="/">Back to ledger</a>
-      <a class="button-ghost" href="/settings/security">Security</a>
+      {#if data.kind === 'remote'}
+        <a class="button-ghost" href="/settings/security">Security</a>
+      {/if}
       <form method="POST" action="/logout">
         <button class="button-ghost" type="submit">Sign out</button>
       </form>
     </div>
   </header>
 
-  <div class="detail-shell">
-    <main class="stack">
-      {#if data.created}
-        <div class="alert compact success">Receipt imported and stored.</div>
-      {/if}
+  {#if !receipt}
+    <div class="detail-shell">
+      <main class="stack">
+        <div class="empty-state">Loading receipt…</div>
+      </main>
+    </div>
+  {:else}
+    <div class="detail-shell">
+      <main class="stack">
+        {#if data.created}
+          <div class="alert compact success">Receipt imported and stored.</div>
+        {/if}
 
-      {#if data.duplicate}
-        <div class="alert compact success">This receipt already existed — opened the saved copy.</div>
-      {/if}
+        {#if data.duplicate}
+          <div class="alert compact success">This receipt already existed — opened the saved copy.</div>
+        {/if}
 
-      {#if form?.message}
-        <div class={`alert compact ${form.type === 'error' ? 'error' : 'success'}`}>{form.message}</div>
-      {/if}
+        {#if flash?.message}
+          <div class={`alert compact ${flash.type === 'error' ? 'error' : 'success'}`}>{flash.message}</div>
+        {/if}
 
-      <section class="panel">
-        <div class="panel-body">
-          <div class="detail-header">
-            <div>
-              <h2 class="detail-title">{receipt.merchantName}</h2>
-              <div class="meta-row detail-meta">
-                <span>{formatDateTime(receipt.issuedAt)}</span>
-                <span>ECC {receipt.eccId}</span>
-                <span>Receipt #{receipt.urlReceiptNumber}</span>
+        <section class="panel">
+          <div class="panel-body">
+            <div class="detail-header">
+              <div>
+                <h2 class="detail-title">{receipt.merchantName}</h2>
+                <div class="meta-row detail-meta">
+                  <span>{formatDateTime(receipt.issuedAt)}</span>
+                  <span>ECC {receipt.eccId}</span>
+                  <span>Receipt #{receipt.urlReceiptNumber}</span>
+                </div>
               </div>
+              <div class="detail-total">{formatCurrency(receipt.total)}</div>
             </div>
-            <div class="detail-total">{formatCurrency(receipt.total)}</div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Line items</h2>
-        </div>
-        <div class="panel-body">
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Qty x unit</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each receipt.parsed.items as item}
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Line items</h2>
+          </div>
+          <div class="panel-body">
+            <table class="items-table">
+              <thead>
                 <tr>
-                  <td><strong>{item.name}</strong></td>
-                  <td>{item.quantity.toFixed(3)} x {item.unitPrice.toFixed(2)}</td>
-                  <td>{formatCurrency(item.total)}</td>
+                  <th>Item</th>
+                  <th>Qty x unit</th>
+                  <th>Total</th>
                 </tr>
+              </thead>
+              <tbody>
+                {#each receipt.parsed.items as item}
+                  <tr>
+                    <td><strong>{item.name}</strong></td>
+                    <td>{item.quantity.toFixed(3)} x {item.unitPrice.toFixed(2)}</td>
+                    <td>{formatCurrency(item.total)}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="two-column">
+          <div class="compact-section">
+            <strong>Taxes</strong>
+            {#if receipt.parsed.taxes.length}
+              {#each receipt.parsed.taxes as tax}
+                <div class="spaced">
+                  <span>{tax.label}</span>
+                  <strong>{formatCurrency(tax.amount)}</strong>
+                </div>
               {/each}
-            </tbody>
-          </table>
-        </div>
-      </section>
+            {:else}
+              <div class="muted">No explicit tax lines.</div>
+            {/if}
+          </div>
 
-      <div class="two-column">
-        <div class="compact-section">
-          <strong>Taxes</strong>
-          {#if receipt.parsed.taxes.length}
-            {#each receipt.parsed.taxes as tax}
-              <div class="spaced">
-                <span>{tax.label}</span>
-                <strong>{formatCurrency(tax.amount)}</strong>
-              </div>
+          <div class="compact-section">
+            <strong>Payments</strong>
+            {#if receipt.parsed.payments.card !== null}
+              <div class="spaced"><span>Card</span><strong>{formatCurrency(receipt.parsed.payments.card)}</strong></div>
+            {/if}
+            {#if receipt.parsed.payments.cashGiven !== null}
+              <div class="spaced"><span>Cash given</span><strong>{formatCurrency(receipt.parsed.payments.cashGiven)}</strong></div>
+            {/if}
+            {#if receipt.parsed.payments.change !== null}
+              <div class="spaced"><span>Change</span><strong>{formatCurrency(receipt.parsed.payments.change)}</strong></div>
+            {/if}
+            {#each Object.entries(receipt.parsed.payments.other) as [label, amount]}
+              <div class="spaced"><span>{label}</span><strong>{formatCurrency(amount)}</strong></div>
             {/each}
-          {:else}
-            <div class="muted">No explicit tax lines.</div>
-          {/if}
+          </div>
         </div>
 
-        <div class="compact-section">
-          <strong>Payments</strong>
-          {#if receipt.parsed.payments.card !== null}
-            <div class="spaced"><span>Card</span><strong>{formatCurrency(receipt.parsed.payments.card)}</strong></div>
-          {/if}
-          {#if receipt.parsed.payments.cashGiven !== null}
-            <div class="spaced"><span>Cash given</span><strong>{formatCurrency(receipt.parsed.payments.cashGiven)}</strong></div>
-          {/if}
-          {#if receipt.parsed.payments.change !== null}
-            <div class="spaced"><span>Change</span><strong>{formatCurrency(receipt.parsed.payments.change)}</strong></div>
-          {/if}
-          {#each Object.entries(receipt.parsed.payments.other) as [label, amount]}
-            <div class="spaced"><span>{label}</span><strong>{formatCurrency(amount)}</strong></div>
-          {/each}
+        <div class="detail-bottom-row">
+          <section class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Source details</h3>
+            </div>
+            <div class="panel-body stack-sm">
+              <div class="meta-grid">
+                <div class="meta-label">Source URL</div>
+                <div class="meta-value">{receipt.sourceUrl}</div>
+              </div>
+              <div class="meta-grid">
+                <div class="meta-label">ECC</div>
+                <div class="meta-value">{receipt.eccId}</div>
+              </div>
+              <div class="meta-grid">
+                <div class="meta-label">URL total</div>
+                <div class="meta-value">{receipt.urlTotal}</div>
+              </div>
+              <div class="meta-grid">
+                <div class="meta-label">Receipt number</div>
+                <div class="meta-value">{receipt.urlReceiptNumber}</div>
+              </div>
+              <div class="meta-grid">
+                <div class="meta-label">Date</div>
+                <div class="meta-value">{receipt.urlDate}</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Raw receipt</h3>
+            </div>
+            <div class="panel-body ascii-body">
+              <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
+            </div>
+          </section>
         </div>
-      </div>
+      </main>
 
-      <div class="detail-bottom-row">
+      <aside class="stack">
         <section class="panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Source details</h3>
-          </div>
-          <div class="panel-body stack-sm">
-            <div class="meta-grid">
-              <div class="meta-label">Source URL</div>
-              <div class="meta-value">{receipt.sourceUrl}</div>
+          <form
+            method="POST"
+            action="?/save"
+            class="panel-body stack"
+            use:enhance={({ formData, cancel }) => {
+              if (data.kind === 'local') {
+                cancel();
+                handleLocalSave(formData);
+                return;
+              }
+              return async ({ result }) => {
+                await applyAction(result);
+              };
+            }}
+          >
+            <label class="field">
+              <span class="label">Category</span>
+              <input class="input" type="text" name="category" value={receipt.category ?? ''} />
+            </label>
+
+            <label class="field">
+              <span class="label">Note</span>
+              <textarea class="textarea" name="note" value={receipt.note ?? ''}></textarea>
+            </label>
+
+            <div class="button-row">
+              <button class="button" type="submit">Save changes</button>
             </div>
-            <div class="meta-grid">
-              <div class="meta-label">ECC</div>
-              <div class="meta-value">{receipt.eccId}</div>
-            </div>
-            <div class="meta-grid">
-              <div class="meta-label">URL total</div>
-              <div class="meta-value">{receipt.urlTotal}</div>
-            </div>
-            <div class="meta-grid">
-              <div class="meta-label">Receipt number</div>
-              <div class="meta-value">{receipt.urlReceiptNumber}</div>
-            </div>
-            <div class="meta-grid">
-              <div class="meta-label">Date</div>
-              <div class="meta-value">{receipt.urlDate}</div>
-            </div>
-          </div>
+          </form>
+          <form
+            method="POST"
+            action="?/delete"
+            class="panel-body"
+            style="padding-top: 0;"
+            onsubmit={(e) => { if (!confirm('Delete this receipt permanently?')) e.preventDefault(); }}
+            use:enhance={({ cancel }) => {
+              if (data.kind === 'local') {
+                cancel();
+                handleLocalDelete();
+                return;
+              }
+              return async ({ result }) => {
+                await applyAction(result);
+                if (result.type === 'redirect') await invalidateAll();
+              };
+            }}
+          >
+            <button class="button-danger" type="submit">Delete</button>
+          </form>
         </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Raw receipt</h3>
-          </div>
-          <div class="panel-body ascii-body">
-            <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
-          </div>
-        </section>
-      </div>
-    </main>
-
-    <aside class="stack">
-      <section class="panel">
-        <form method="POST" action="?/save" class="panel-body stack">
-          <label class="field">
-            <span class="label">Category</span>
-            <input class="input" type="text" name="category" value={receipt.category ?? ''} />
-          </label>
-
-          <label class="field">
-            <span class="label">Note</span>
-            <textarea class="textarea" name="note" value={receipt.note ?? ''}></textarea>
-          </label>
-
-          <div class="button-row">
-            <button class="button" type="submit">Save changes</button>
-          </div>
-        </form>
-        <form method="POST" action="?/delete" class="panel-body" style="padding-top: 0;" onsubmit={(e) => { if (!confirm('Delete this receipt permanently?')) e.preventDefault(); }}>
-          <button class="button-danger" type="submit">Delete</button>
-        </form>
-      </section>
-    </aside>
-  </div>
+      </aside>
+    </div>
+  {/if}
 </div>
