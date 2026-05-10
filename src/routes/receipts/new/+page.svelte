@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
+  import AppHeader from '$lib/components/app-header.svelte';
   import * as localStore from '$lib/local-store';
   import { formField, localOr, synthesizeNewReceipt } from '$lib/receipts';
   import type { ActionData, PageData } from './$types';
@@ -54,12 +55,7 @@
 </svelte:head>
 
 <div class="app-shell">
-  <header class="app-header">
-    <h1 class="app-title">Receipt Ledger</h1>
-    <div class="header-actions">
-      <a class="button-ghost" href="/">Back to ledger</a>
-    </div>
-  </header>
+  <AppHeader user={data.user} back showSecurity={false} showSignOut={false} />
 
   <div class="dashboard stack">
     <section class="panel">

@@ -1,17 +1,18 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { enhance } from '$app/forms';
+  import AppHeader from '$lib/components/app-header.svelte';
   import * as localStore from '$lib/local-store';
-  import { formField, localOr, useReceipt } from '$lib/receipts';
+  import { formField, isManual, localOr, useReceipt } from '$lib/receipts';
   import { formatCurrency, formatDate, formatDateTime } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
-  const view = useReceipt(() => data, () => data.id);
+  const view = useReceipt(() => data);
   const receipt = $derived(view.receipt);
 
-  const isManual = $derived(receipt?.eccId === 'manual');
+  const manual = $derived(receipt ? isManual(receipt) : false);
   const hasSource = $derived(!!receipt?.sourceUrl);
   const hasItems = $derived((receipt?.parsed.items.length ?? 0) > 0);
   const hasTaxes = $derived((receipt?.parsed.taxes.length ?? 0) > 0);
@@ -54,18 +55,7 @@
 </svelte:head>
 
 <div class="app-shell">
-  <header class="app-header">
-    <h1 class="app-title">Receipt Ledger</h1>
-    <div class="header-actions">
-      <a class="button-ghost" href="/">Back to ledger</a>
-      {#if view.kind === 'remote'}
-        <a class="button-ghost" href="/settings/security">Security</a>
-      {/if}
-      <form method="POST" action="/?/logout">
-        <button class="button-ghost" type="submit">Sign out</button>
-      </form>
-    </div>
-  </header>
+  <AppHeader user={data.user} back />
 
   {#if !receipt}
     <div class="detail-shell">
@@ -94,8 +84,8 @@
               <div>
                 <h2 class="detail-title">{receipt.merchantName}</h2>
                 <div class="meta-row detail-meta">
-                  <span>{isManual ? formatDate(receipt.urlDate) : formatDateTime(receipt.issuedAt)}</span>
-                  {#if !isManual}
+                  <span>{manual ? formatDate(receipt.urlDate) : formatDateTime(receipt.issuedAt)}</span>
+                  {#if !manual}
                     <span>ECC {receipt.eccId}</span>
                     <span>Receipt #{receipt.urlReceiptNumber}</span>
                   {/if}

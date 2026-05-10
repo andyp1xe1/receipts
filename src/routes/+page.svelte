@@ -1,12 +1,14 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
+  import AppHeader from '$lib/components/app-header.svelte';
   import QrScanner from '$lib/components/qr-scanner.svelte';
   import {
     computeDashboardStats,
     computeEnhancedStats,
     distinctCategories,
     exportFilename,
+    isManual,
     localOr,
     matchesFilters,
     parseReceiptUrl,
@@ -33,28 +35,25 @@
   let exportLimit = $state('all');
   const store = useReceipts(() => data);
 
-  const view = $derived.by(() => {
-    const records = store.records;
-    const ledgerFilters: ExportFilters = { month: data.month, category: data.category };
-    const filtered = records.filter((record) => matchesFilters(record, ledgerFilters));
-    return {
-      receipts: filtered,
-      stats: computeDashboardStats(records),
-      enhancedStats: computeEnhancedStats(records, data.period),
-      categories: distinctCategories(filtered),
-      exportCategories: distinctCategories(records)
-    };
-  });
+  const stats = $derived(computeDashboardStats(store.records));
+  const enhancedStats = $derived(computeEnhancedStats(store.records, data.period));
+  const exportCategories = $derived(distinctCategories(store.records));
+  const filteredReceipts = $derived(
+    store.records.filter((record) =>
+      matchesFilters(record, { month: data.month, category: data.category })
+    )
+  );
+  const ledgerCategories = $derived(distinctCategories(filteredReceipts));
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const currentMonthTotal = $derived(
-    view.stats.monthlySpend.find((month) => month.month === currentMonth)?.total ?? 0
+    stats.monthlySpend.find((month) => month.month === currentMonth)?.total ?? 0
   );
   const maxPeriodTotal = $derived(
-    view.enhancedStats.periodTotals.reduce((max, p) => Math.max(max, p.total), 0)
+    enhancedStats.periodTotals.reduce((max, p) => Math.max(max, p.total), 0)
   );
   const maxCategoryTotal = $derived(
-    view.stats.topCategories.reduce((max, c) => Math.max(max, c.total), 0)
+    stats.topCategories.reduce((max, c) => Math.max(max, c.total), 0)
   );
 
   function defaultFromDate(month: string | null): string {
@@ -175,20 +174,13 @@
 </svelte:head>
 
 <div class="app-shell">
-  <header class="app-header">
-    <h1 class="app-title">Receipt Ledger</h1>
-    <div class="header-actions">
-      <div class="status-note">{view.stats.receiptCount} receipts</div>
-      {#if data.user?.kind === 'remote'}
-        <a class="button-ghost" href="/settings/security">Security</a>
+  <AppHeader user={data.user}>
+    {#snippet leading()}
+      {#if stats.receiptCount > 0}
+        <div class="status-note">{stats.receiptCount} {stats.receiptCount === 1 ? 'receipt' : 'receipts'}</div>
       {/if}
-      {#if data.user}
-        <form method="POST" action="/?/logout">
-          <button class="button-ghost" type="submit">Sign out</button>
-        </form>
-      {/if}
-    </div>
-  </header>
+    {/snippet}
+  </AppHeader>
 
   <div class="dashboard stack">
     {#if data.user?.kind === 'remote' && !data.user.twoFactorEnabled}
@@ -197,7 +189,6 @@
       </div>
     {/if}
 
-    <!-- Import bar -->
     <form
       method="POST"
       action="?/ingest"
@@ -233,7 +224,27 @@
       <div class={`alert compact ${form.type === 'error' ? 'error' : 'success'}`}>{form.message}</div>
     {/if}
 
-    <!-- Inline filters -->
+    {#if store.records.length === 0}
+      <section class="empty-hero">
+        <svg class="empty-art" viewBox="0 0 140 160" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M36 20 H104 V134 L96 126 L88 134 L80 126 L72 134 L64 126 L56 134 L48 126 L40 134 L36 126 Z" />
+          <path d="M46 40 H94" stroke-dasharray="2 4" opacity="0.7" />
+          <path d="M46 52 H88" stroke-dasharray="2 4" opacity="0.7" />
+          <path d="M46 64 H92" stroke-dasharray="2 4" opacity="0.7" />
+          <circle cx="58" cy="92" r="2" fill="currentColor" stroke="none" />
+          <circle cx="82" cy="92" r="2" fill="currentColor" stroke="none" />
+          <path d="M58 104 Q70 110 82 104" />
+        </svg>
+        <h2 class="empty-hero-title">Your ledger is empty — and that's fine.</h2>
+        <p class="empty-hero-copy">
+          {#if data.user?.kind === 'local'}
+            Receipts you add live only in this browser. Paste a URL above, scan a QR, or jot one down by hand.
+          {:else}
+            Paste a receipt URL above, scan a QR, or jot one down by hand.
+          {/if}
+        </p>
+      </section>
+    {:else}
     <div class="ledger-layout">
       <aside class="ledger-sidebar stack">
         <details class="panel export-panel">
@@ -299,7 +310,7 @@
                 <select class="select" bind:value={exportCategory} onchange={useCustomScope}>
                   <option value="">All categories</option>
                   <option value="__unsorted__">Unsorted</option>
-                  {#each view.exportCategories.filter((category) => category !== 'Unsorted') as category}
+                  {#each exportCategories.filter((category) => category !== 'Unsorted') as category}
                     <option value={category}>{category}</option>
                   {/each}
                 </select>
@@ -322,11 +333,11 @@
           </div>
         </details>
 
-        {#if view.enhancedStats.periodTotals.length || view.stats.topCategories.length}
+        {#if enhancedStats.periodTotals.length || stats.topCategories.length}
           <section class="summary-grid-stacked">
             <div class="summary-card">
               <div class="summary-label">Tracked spend</div>
-              <div class="summary-value">{formatCurrency(view.stats.totalSpend)}</div>
+              <div class="summary-value">{formatCurrency(stats.totalSpend)}</div>
             </div>
             <div class="summary-card">
               <div class="summary-label">This month</div>
@@ -344,9 +355,9 @@
                 {/each}
               </div>
             </div>
-            {#each view.enhancedStats.periodTotals.slice(0, 6) as entry}
+            {#each enhancedStats.periodTotals.slice(0, 6) as entry}
               <div class="stat-row">
-                <span class="stat-label">{formatPeriodLabel(view.enhancedStats.period, entry.period)}</span>
+                <span class="stat-label">{formatPeriodLabel(enhancedStats.period, entry.period)}</span>
                 <div class="stat-bar-track">
                   <div class="stat-bar-fill" style={`width:${maxPeriodTotal ? (entry.total / maxPeriodTotal) * 100 : 0}%`}></div>
                 </div>
@@ -355,10 +366,10 @@
             {/each}
           </div>
 
-          {#if view.stats.topCategories.length}
+          {#if stats.topCategories.length}
             <div class="stats-group">
               <div class="stats-group-label">Categories</div>
-              {#each view.stats.topCategories.slice(0, 4) as cat}
+              {#each stats.topCategories.slice(0, 4) as cat}
                 <div class="stat-row">
                   <span class="stat-label">{cat.category}</span>
                   <div class="stat-bar-track">
@@ -382,7 +393,7 @@
             >
               All
             </a>
-            {#each view.stats.monthlySpend.slice().reverse() as month}
+            {#each stats.monthlySpend.slice().reverse() as month}
               <a
                 class={`tab-link ${data.month === month.month ? 'active' : ''}`}
                 href={`/?${new URLSearchParams({ month: month.month, ...(data.category ? { category: data.category } : {}) }).toString()}`}
@@ -397,7 +408,7 @@
           <span class="filter-label">Category</span>
           <div class="filter-row">
             <a class={`tab-link ${!data.category ? 'active' : ''}`} href={data.month ? `/?month=${data.month}` : '/'}>All</a>
-            {#each view.categories as category}
+            {#each ledgerCategories as category}
               <a
                 class={`tab-link ${slugCategory(data.category) === slugCategory(category) ? 'active' : ''}`}
                 href={`/?${new URLSearchParams({ ...(data.month ? { month: data.month } : {}), category: category === 'Unsorted' ? '__unsorted__' : category }).toString()}`}
@@ -408,18 +419,17 @@
           </div>
         </div>
 
-        <!-- Ledger -->
         <section class="panel">
           <div class="receipt-list">
-            {#if view.receipts.length}
-              {#each view.receipts as receipt}
-                {@const manual = receipt.eccId === 'manual'}
+            {#if filteredReceipts.length}
+              {#each filteredReceipts as receipt}
+                {@const manual = isManual(receipt)}
                 <a class="receipt-row" href={`/receipts/${receipt.id}`}>
                   <div>
                      <h3 class="receipt-name">{receipt.merchantName}</h3>
                      <div class="meta-row detail-meta">
                        <span>{manual ? formatDate(receipt.urlDate) : formatDateTime(receipt.issuedAt)}</span>
-                       <span>{receipt.category || 'Unsorted'}</span>
+                       <span>{slugCategory(receipt.category)}</span>
                        {#if !manual}
                          <span>ECC {receipt.eccId}</span>
                          <span>#{receipt.urlReceiptNumber}</span>
@@ -430,11 +440,20 @@
                 </a>
               {/each}
             {:else}
-              <div class="empty-state">Add your first receipt — paste a URL or use Add manually.</div>
+              <div class="empty-state">
+                <svg class="empty-art empty-art-sm" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="34" cy="34" r="18" />
+                  <path d="M47 47 L62 62" />
+                  <path d="M28 34 H40" />
+                </svg>
+                <div class="empty-state-title">Nothing matches these filters</div>
+                <div class="empty-state-copy">Try a different month or category, or clear the filters to see everything.</div>
+              </div>
             {/if}
           </div>
         </section>
       </div>
     </div>
+    {/if}
   </div>
 </div>
