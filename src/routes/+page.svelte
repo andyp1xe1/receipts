@@ -1,7 +1,10 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { applyAction, enhance } from '$app/forms';
+  import { goto } from '$app/navigation';
   import QrScanner from '$lib/components/qr-scanner.svelte';
   import * as localStore from '$lib/local-store';
+  import { parseReceiptUrl } from '$lib/receipts';
   import {
     computeDashboardStats,
     computeEnhancedStats,
@@ -21,6 +24,7 @@
   let sourceUrl = $state('');
   let appliedForm = $state<ActionData | null>(null);
   let sourceInput: HTMLInputElement | null = null;
+  let importError = $state<string | null>(null);
   let exportScope = $state<ExportScope>('all');
   let exportFrom = $state('');
   let exportTo = $state('');
@@ -290,7 +294,28 @@
     {/if}
 
     <!-- Import bar -->
-    <form method="POST" action="?/ingest" class="import-bar">
+    <form
+      method="POST"
+      action="?/ingest"
+      class="import-bar"
+      use:enhance={({ formData, cancel }) => {
+        importError = null;
+        if (isLocal) {
+          cancel();
+          const raw = formData.get('source_url')?.toString() ?? '';
+          const metadata = parseReceiptUrl(raw);
+          if (!metadata) {
+            importError = 'Paste or scan a full MEV receipt URL.';
+            return;
+          }
+          goto(`/receipts/new?prefill=${encodeURIComponent(metadata.sourceUrl)}`);
+          return;
+        }
+        return async ({ result }) => {
+          await applyAction(result);
+        };
+      }}
+    >
       <input
         bind:this={sourceInput}
         bind:value={sourceUrl}
@@ -302,9 +327,12 @@
       />
       <QrScanner onscan={handleScannerResult} />
       <button class="button" type="submit">Import</button>
+      <a class="button-ghost" href="/receipts/new">Add manually</a>
     </form>
 
-    {#if form?.message}
+    {#if importError}
+      <div class="alert compact error">{importError}</div>
+    {:else if form?.message}
       <div class={`alert compact ${form.type === 'error' ? 'error' : 'success'}`}>{form.message}</div>
     {/if}
 
