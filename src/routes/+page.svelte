@@ -1,6 +1,17 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import QrScanner from '$lib/components/qr-scanner.svelte';
+  import * as localStore from '$lib/local-store';
+  import {
+    computeDashboardStats,
+    computeEnhancedStats,
+    exportFilename,
+    toCsv,
+    toJson,
+    toPdf,
+    type ExportFilters
+  } from '$lib/receipts';
+  import type { ReceiptRecord } from '$lib/types';
   import { formatCurrency, formatMonthLabel, formatDateTime, formatPeriodLabel, slugCategory } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
@@ -19,15 +30,75 @@
   let exportPreviewLimited = $state(0);
   let exportPreviewLoading = $state(false);
 
+  let localRecords = $state<ReceiptRecord[]>([]);
+  const isLocal = $derived(data.user?.kind === 'local');
+
+  function loadLocal() {
+    localRecords = localStore.list();
+  }
+
+  $effect(() => {
+    if (!browser || !isLocal) return;
+    loadLocal();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === 'receipts.records.v1') loadLocal();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  });
+
+  function matchesFilters(record: ReceiptRecord, filters: ExportFilters): boolean {
+    if (filters.month && record.urlDate.slice(0, 7) !== filters.month) return false;
+    if (filters.from && record.urlDate < filters.from) return false;
+    if (filters.to && record.urlDate > filters.to) return false;
+    if (filters.category) {
+      if (filters.category === '__unsorted__') {
+        if (record.category && record.category.trim() !== '') return false;
+      } else if (record.category !== filters.category) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function distinctCategories(records: ReceiptRecord[]): string[] {
+    const seen = new Set<string>();
+    for (const record of records) {
+      seen.add(record.category && record.category.trim() !== '' ? record.category : 'Unsorted');
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }
+
+  const view = $derived.by(() => {
+    if (isLocal) {
+      const ledgerFilters: ExportFilters = { month: data.month, category: data.category };
+      const filtered = localRecords.filter((record) => matchesFilters(record, ledgerFilters));
+      return {
+        receipts: filtered,
+        stats: computeDashboardStats(localRecords),
+        enhancedStats: computeEnhancedStats(localRecords, data.period),
+        categories: distinctCategories(filtered),
+        exportCategories: distinctCategories(localRecords)
+      };
+    }
+    return {
+      receipts: data.receipts,
+      stats: data.stats,
+      enhancedStats: data.enhancedStats,
+      categories: data.categories,
+      exportCategories: data.exportCategories
+    };
+  });
+
   const currentMonth = new Date().toISOString().slice(0, 7);
   const currentMonthTotal = $derived(
-    data.stats.monthlySpend.find((month) => month.month === currentMonth)?.total ?? 0
+    view.stats.monthlySpend.find((month) => month.month === currentMonth)?.total ?? 0
   );
-  const maxPeriodTotal = $derived.by(() =>
-    data.enhancedStats.periodTotals.reduce((max, p) => Math.max(max, p.total), 0)
+  const maxPeriodTotal = $derived(
+    view.enhancedStats.periodTotals.reduce((max, p) => Math.max(max, p.total), 0)
   );
-  const maxCategoryTotal = $derived.by(() =>
-    data.stats.topCategories.reduce((max, c) => Math.max(max, c.total), 0)
+  const maxCategoryTotal = $derived(
+    view.stats.topCategories.reduce((max, c) => Math.max(max, c.total), 0)
   );
 
   function defaultFromDate(month: string | null): string {
@@ -41,30 +112,65 @@
     return lastDay.toISOString().slice(0, 10);
   }
 
-  function exportUrl(format: string, overrides: { pdfMode?: 'compact' | 'full' } = {}): string {
-    const params = exportParams(overrides);
-    const qs = params.toString();
-    return `/api/export/${format}${qs ? `?${qs}` : ''}`;
+  function buildExportFilters(): ExportFilters {
+    const filters: ExportFilters = {};
+    if (exportScope === 'current') {
+      if (data.month) filters.month = data.month;
+      if (data.category) filters.category = data.category;
+    } else if (exportScope === 'custom') {
+      if (exportFrom) filters.from = exportFrom;
+      if (exportTo) filters.to = exportTo;
+      if (exportCategory) filters.category = exportCategory;
+    }
+    if (exportLimit !== 'all') filters.limit = Number.parseInt(exportLimit, 10);
+    return filters;
   }
 
   function exportParams(overrides: { pdfMode?: 'compact' | 'full' } = {}): URLSearchParams {
     const params = new URLSearchParams();
-
-    if (exportScope === 'current') {
-      if (data.month) params.set('month', data.month);
-      if (data.category) params.set('category', data.category);
-    }
-
-    if (exportScope === 'custom') {
-      if (exportFrom) params.set('from', exportFrom);
-      if (exportTo) params.set('to', exportTo);
-      if (exportCategory) params.set('category', exportCategory);
-    }
-
-    if (exportLimit !== 'all') params.set('limit', exportLimit);
+    const filters = buildExportFilters();
+    if (filters.month) params.set('month', filters.month);
+    if (filters.category) params.set('category', filters.category);
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    if (filters.limit) params.set('limit', String(filters.limit));
     if (overrides.pdfMode === 'full') params.set('pdf_mode', 'full');
-
     return params;
+  }
+
+  function exportUrl(format: string, overrides: { pdfMode?: 'compact' | 'full' } = {}): string {
+    const qs = exportParams(overrides).toString();
+    return `/api/export/${format}${qs ? `?${qs}` : ''}`;
+  }
+
+  function downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportLocal(format: 'csv' | 'json' | 'pdf', pdfMode: 'compact' | 'full' = 'compact'): void {
+    const filters: ExportFilters = { ...buildExportFilters(), pdfMode };
+    const matching = localRecords.filter((record) => matchesFilters(record, filters));
+    const limited = filters.limit ? matching.slice(0, filters.limit) : matching;
+
+    if (format === 'csv') {
+      downloadBlob(new Blob([toCsv(limited)], { type: 'text/csv;charset=utf-8' }), exportFilename(filters, 'csv'));
+    } else if (format === 'json') {
+      downloadBlob(
+        new Blob([toJson(limited, filters)], { type: 'application/json' }),
+        exportFilename(filters, 'json')
+      );
+    } else {
+      const buffer = toPdf(limited, filters);
+      const suffix = pdfMode === 'full' ? 'full' : undefined;
+      downloadBlob(new Blob([buffer], { type: 'application/pdf' }), exportFilename(filters, 'pdf', suffix));
+    }
   }
 
   function currentFiltersLabel(): string {
@@ -79,7 +185,6 @@
     if (exportPreviewTotal === exportPreviewLimited) {
       return `${exportPreviewTotal} receipt${exportPreviewTotal === 1 ? '' : 's'} ready`;
     }
-
     return `${exportPreviewTotal} match, exporting ${exportPreviewLimited}`;
   }
 
@@ -108,19 +213,28 @@
     exportTo = defaultToDate(data.month);
     exportCategory = data.category ?? '';
     exportLimit = 'all';
-    exportPreviewTotal = data.receipts.length;
-    exportPreviewLimited = data.receipts.length;
+    exportPreviewTotal = view.receipts.length;
+    exportPreviewLimited = view.receipts.length;
     exportPreviewLoading = false;
   });
 
   $effect(() => {
     if (!browser) return;
 
+    const filters = buildExportFilters();
+
+    if (isLocal) {
+      const matching = localRecords.filter((record) => matchesFilters(record, filters));
+      exportPreviewTotal = matching.length;
+      exportPreviewLimited = filters.limit ? Math.min(filters.limit, matching.length) : matching.length;
+      exportPreviewLoading = false;
+      return;
+    }
+
     const controller = new AbortController();
-    const params = exportParams();
     exportPreviewLoading = true;
 
-    window.fetch(`/api/export/preview?${params.toString()}`, { signal: controller.signal })
+    window.fetch(`/api/export/preview?${exportParams().toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error('Preview failed');
         const payload = (await response.json()) as { total: number; limited: number };
@@ -148,7 +262,7 @@
   <title>Receipt Ledger</title>
   <meta
     name="description"
-    content="Paste Moldova MEV receipt URLs, capture them in D1, and review your expense history from one tidy ledger."
+    content="Track Moldova MEV receipts locally in your browser, or sign in to a synced ledger."
   />
 </svelte:head>
 
@@ -156,7 +270,7 @@
   <header class="app-header">
     <h1 class="app-title">Receipt Ledger</h1>
     <div class="header-actions">
-      <div class="status-note">{data.stats.receiptCount} receipts</div>
+      <div class="status-note">{view.stats.receiptCount} receipts</div>
       {#if data.user?.kind === 'remote'}
         <a class="button-ghost" href="/settings/security">Security</a>
       {/if}
@@ -260,7 +374,7 @@
                 <select class="select" bind:value={exportCategory} onchange={useCustomScope}>
                   <option value="">All categories</option>
                   <option value="__unsorted__">Unsorted</option>
-                  {#each data.exportCategories.filter((category) => category !== 'Unsorted') as category}
+                  {#each view.exportCategories.filter((category) => category !== 'Unsorted') as category}
                     <option value={category}>{category}</option>
                   {/each}
                 </select>
@@ -275,19 +389,26 @@
             </div>
 
             <div class="export-actions">
-              <a class="button-secondary export-link" href={exportUrl('csv')}>Download CSV</a>
-              <a class="button-secondary export-link" href={exportUrl('json')}>Download full JSON</a>
-              <a class="button-secondary export-link" href={exportUrl('pdf')}>Download PDF compact</a>
-              <a class="button-secondary export-link" href={exportUrl('pdf', { pdfMode: 'full' })}>Download PDF full</a>
+              {#if isLocal}
+                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('csv')}>Download CSV</button>
+                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('json')}>Download full JSON</button>
+                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('pdf', 'compact')}>Download PDF compact</button>
+                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('pdf', 'full')}>Download PDF full</button>
+              {:else}
+                <a class="button-secondary export-link" href={exportUrl('csv')}>Download CSV</a>
+                <a class="button-secondary export-link" href={exportUrl('json')}>Download full JSON</a>
+                <a class="button-secondary export-link" href={exportUrl('pdf')}>Download PDF compact</a>
+                <a class="button-secondary export-link" href={exportUrl('pdf', { pdfMode: 'full' })}>Download PDF full</a>
+              {/if}
             </div>
           </div>
         </details>
 
-        {#if data.enhancedStats.periodTotals.length || data.stats.topCategories.length}
+        {#if view.enhancedStats.periodTotals.length || view.stats.topCategories.length}
           <section class="summary-grid-stacked">
             <div class="summary-card">
               <div class="summary-label">Tracked spend</div>
-              <div class="summary-value">{formatCurrency(data.stats.totalSpend)}</div>
+              <div class="summary-value">{formatCurrency(view.stats.totalSpend)}</div>
             </div>
             <div class="summary-card">
               <div class="summary-label">This month</div>
@@ -305,9 +426,9 @@
                 {/each}
               </div>
             </div>
-            {#each data.enhancedStats.periodTotals.slice(0, 6) as entry}
+            {#each view.enhancedStats.periodTotals.slice(0, 6) as entry}
               <div class="stat-row">
-                <span class="stat-label">{formatPeriodLabel(data.enhancedStats.period, entry.period)}</span>
+                <span class="stat-label">{formatPeriodLabel(view.enhancedStats.period, entry.period)}</span>
                 <div class="stat-bar-track">
                   <div class="stat-bar-fill" style={`width:${maxPeriodTotal ? (entry.total / maxPeriodTotal) * 100 : 0}%`}></div>
                 </div>
@@ -316,10 +437,10 @@
             {/each}
           </div>
 
-          {#if data.stats.topCategories.length}
+          {#if view.stats.topCategories.length}
             <div class="stats-group">
               <div class="stats-group-label">Categories</div>
-              {#each data.stats.topCategories.slice(0, 4) as cat}
+              {#each view.stats.topCategories.slice(0, 4) as cat}
                 <div class="stat-row">
                   <span class="stat-label">{cat.category}</span>
                   <div class="stat-bar-track">
@@ -343,7 +464,7 @@
             >
               All
             </a>
-            {#each data.stats.monthlySpend.slice().reverse() as month}
+            {#each view.stats.monthlySpend.slice().reverse() as month}
               <a
                 class={`tab-link ${data.month === month.month ? 'active' : ''}`}
                 href={`/?${new URLSearchParams({ month: month.month, ...(data.category ? { category: data.category } : {}) }).toString()}`}
@@ -358,7 +479,7 @@
           <span class="filter-label">Category</span>
           <div class="filter-row">
             <a class={`tab-link ${!data.category ? 'active' : ''}`} href={data.month ? `/?month=${data.month}` : '/'}>All</a>
-            {#each data.categories as category}
+            {#each view.categories as category}
               <a
                 class={`tab-link ${slugCategory(data.category) === slugCategory(category) ? 'active' : ''}`}
                 href={`/?${new URLSearchParams({ ...(data.month ? { month: data.month } : {}), category: category === 'Unsorted' ? '__unsorted__' : category }).toString()}`}
@@ -372,8 +493,8 @@
         <!-- Ledger -->
         <section class="panel">
           <div class="receipt-list">
-            {#if data.receipts.length}
-              {#each data.receipts as receipt}
+            {#if view.receipts.length}
+              {#each view.receipts as receipt}
                 <a class="receipt-row" href={`/receipts/${receipt.id}`}>
                   <div>
                      <h3 class="receipt-name">{receipt.merchantName}</h3>
