@@ -74,7 +74,7 @@
       </form>
     </section>
 
-    {#if data.user?.twoFactorEnabled}
+    {#if data.user?.kind === 'remote' && data.user.twoFactorEnabled}
       <section class="panel panel-body stack-sm">
         <div>
           <h2 class="panel-title">Two-factor authentication is on</h2>

@@ -1,9 +1,11 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { createAuth } from '$lib/server/auth/auth';
 import { authUnavailableMessage, isAuthConfigurationError } from '$lib/server/auth/errors';
+import { hasLocalSession } from '$lib/server/auth/local-session';
 import { authTablesReady, countAuthUsers } from '$lib/server/auth/state';
 
 const PUBLIC_PATHS = new Set(['/login', '/setup', '/two-factor']);
+const REMOTE_ONLY_PATHS = new Set(['/setup', '/two-factor']);
 
 function isStaticPath(pathname: string): boolean {
   return pathname.startsWith('/_app/') || pathname === '/favicon.svg';
@@ -13,8 +15,13 @@ function isApiPath(pathname: string): boolean {
   return pathname.startsWith('/api/');
 }
 
+function isSettingsPath(pathname: string): boolean {
+  return pathname.startsWith('/settings/');
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
   const { pathname } = event.url;
+  const hasRemoteBackend = !!event.platform?.env.DB;
 
   event.locals.authTablesReady = await authTablesReady(event.platform);
   event.locals.authSetupComplete = event.locals.authTablesReady
@@ -43,6 +50,25 @@ export const handle: Handle = async ({ event, resolve }) => {
     return resolve(event);
   }
 
+  if (hasLocalSession(event.cookies)) {
+    event.locals.user = { kind: 'local' };
+
+    if (isApiPath(pathname)) {
+      return new Response('Local mode does not use server APIs.', { status: 400 });
+    }
+
+    if (pathname === '/login' || REMOTE_ONLY_PATHS.has(pathname) || isSettingsPath(pathname)) {
+      throw redirect(303, '/');
+    }
+
+    return resolve(event);
+  }
+
+  if (!hasRemoteBackend) {
+    if (pathname === '/login') return resolve(event);
+    throw redirect(303, '/login');
+  }
+
   if (event.locals.authTablesReady) {
     try {
       const session = await createAuth(event).api.getSession({
@@ -51,7 +77,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
       if (session) {
         event.locals.session = session.session;
-        event.locals.user = session.user;
+        event.locals.user = { kind: 'remote', ...session.user };
       }
     } catch (error) {
       if (isAuthConfigurationError(error)) {

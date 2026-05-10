@@ -4,21 +4,16 @@ import { createAuth } from '$lib/server/auth/auth';
 import { authErrorMessage, isHttpControlFlow } from '$lib/server/auth/errors';
 import { getFormString } from '$lib/server/forms';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
-  if (!locals.authTablesReady) {
-    return { migrated: false };
-  }
-
-  if (!locals.authSetupComplete) {
-    throw redirect(303, '/setup');
-  }
-
+export const load: PageServerLoad = async ({ locals, platform, url }) => {
   if (locals.user) {
     throw redirect(303, '/');
   }
 
+  const hasRemoteBackend = !!platform?.env.DB;
+
   return {
-    migrated: true,
+    hasRemoteBackend,
+    migrated: hasRemoteBackend ? locals.authTablesReady : true,
     authUnavailable: url.searchParams.get('auth') === 'unavailable'
   };
 };

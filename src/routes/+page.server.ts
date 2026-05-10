@@ -6,7 +6,7 @@ import { getFormString } from '$lib/server/forms';
 import { fetchAndParseReceipt } from '$lib/server/mev/mev';
 import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 
-export const load: PageServerLoad = async ({ platform, url }) => {
+export const load: PageServerLoad = async ({ locals, platform, url }) => {
   const month = url.searchParams.get('month');
   const category = url.searchParams.get('category');
   const periodParam = url.searchParams.get('period');
@@ -15,6 +15,20 @@ export const load: PageServerLoad = async ({ platform, url }) => {
   )
     ? (periodParam as 'weekly' | 'monthly' | 'yearly')
     : 'monthly';
+
+  if (locals.user?.kind === 'local') {
+    return {
+      month,
+      category,
+      period,
+      kind: 'local' as const,
+      receipts: [],
+      stats: { totalSpend: 0, receiptCount: 0, topCategories: [], monthlySpend: [] },
+      enhancedStats: { period, periodTotals: [], categoryByPeriod: [] },
+      categories: [],
+      exportCategories: []
+    };
+  }
 
   const [receipts, stats, enhancedStats, exportCategories] = await Promise.all([
     listReceipts(platform, { month, category }),
@@ -27,6 +41,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
     month,
     category,
     period,
+    kind: 'remote' as const,
     receipts,
     stats,
     enhancedStats,
@@ -36,7 +51,10 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 };
 
 export const actions: Actions = {
-  ingest: async ({ request, platform }) => {
+  ingest: async ({ locals, request, platform }) => {
+    if (locals.user?.kind === 'local') {
+      return fail(400, { type: 'error', message: 'Local mode handles imports in the browser.' });
+    }
     const formData = await request.formData();
     const sourceUrl = getFormString(formData, 'source_url').trim();
     const category = getFormString(formData, 'category').trim() || null;

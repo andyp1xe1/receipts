@@ -157,8 +157,10 @@
     <h1 class="app-title">Receipt Ledger</h1>
     <div class="header-actions">
       <div class="status-note">{data.stats.receiptCount} receipts</div>
-      {#if data.user}
+      {#if data.user?.kind === 'remote'}
         <a class="button-ghost" href="/settings/security">Security</a>
+      {/if}
+      {#if data.user}
         <form method="POST" action="/logout">
           <button class="button-ghost" type="submit">Sign out</button>
         </form>
@@ -167,7 +169,7 @@
   </header>
 
   <div class="dashboard stack">
-    {#if data.user && !data.user.twoFactorEnabled}
+    {#if data.user?.kind === 'remote' && !data.user.twoFactorEnabled}
       <div class="alert compact">
         Two-factor authentication is off. <a href="/settings/security">Set it up now</a> before adding more data.
       </div>

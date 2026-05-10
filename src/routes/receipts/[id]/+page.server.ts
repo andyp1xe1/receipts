@@ -3,17 +3,20 @@ import type { Actions, PageServerLoad } from './$types';
 import { deleteReceipt, getReceiptById, updateReceiptMetadata } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
 
-export const load: PageServerLoad = async ({ params, platform, url }) => {
+export const load: PageServerLoad = async ({ locals, params, platform, url }) => {
+  const created = url.searchParams.get('created') === '1';
+  const duplicate = url.searchParams.get('duplicate') === '1';
+
+  if (locals.user?.kind === 'local') {
+    throw redirect(303, '/');
+  }
+
   const receipt = await getReceiptById(platform, params.id);
   if (!receipt) {
     throw redirect(303, '/');
   }
 
-  return {
-    receipt,
-    created: url.searchParams.get('created') === '1',
-    duplicate: url.searchParams.get('duplicate') === '1'
-  };
+  return { receipt, created, duplicate };
 };
 
 export const actions: Actions = {
