@@ -56,3 +56,32 @@ export function synthesizeManual(input: ManualReceiptInput): ParsedReceipt {
     issuedAt: `${input.urlDate}T00:00:00`
   };
 }
+
+export interface NewReceiptInput {
+  merchantName: string;
+  total: string;
+  urlDate: string;
+  sourceUrl?: string;
+}
+
+export function synthesizeNewReceipt(input: NewReceiptInput): ParsedReceipt {
+  if (input.sourceUrl) {
+    const metadata = parseReceiptUrl(input.sourceUrl);
+    if (metadata) {
+      const base = synthesizeFromUrl(metadata);
+      const enteredTotal = input.total.trim();
+      return {
+        ...base,
+        merchant: { name: input.merchantName.trim(), taxId: '', address: '' },
+        total: enteredTotal || metadata.urlTotal,
+        urlDate: input.urlDate || metadata.urlDate,
+        issuedAt: `${input.urlDate || metadata.urlDate}T00:00:00`
+      };
+    }
+  }
+  return synthesizeManual({
+    merchantName: input.merchantName,
+    total: input.total,
+    urlDate: input.urlDate
+  });
+}

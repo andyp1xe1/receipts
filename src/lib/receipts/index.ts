@@ -18,6 +18,8 @@ export {
 export {
   synthesizeFromUrl,
   synthesizeManual,
+  synthesizeNewReceipt,
   tryIngestUrl,
-  type ManualReceiptInput
+  type ManualReceiptInput,
+  type NewReceiptInput
 } from './ingest';
