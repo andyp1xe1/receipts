@@ -7,6 +7,7 @@ import { betterAuth } from 'better-auth';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { twoFactor } from 'better-auth/plugins/two-factor';
 import { AuthConfigurationError } from '$lib/server/auth/errors';
+import { hashPassword, verifyPassword } from '$lib/server/auth/password';
 import { countAuthUsers } from '$lib/server/auth/state';
 import { getDb } from '$lib/server/db/db';
 import { authSchema } from '$lib/server/db/schema';
@@ -58,7 +59,11 @@ export function createAuth(event: RequestEvent) {
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
-      minPasswordLength: 12
+      minPasswordLength: 12,
+      password: { hash: hashPassword, verify: verifyPassword }
+    },
+    session: {
+      cookieCache: { enabled: true, maxAge: 300 }
     },
     trustedOrigins: [event.url.origin],
     advanced: {
