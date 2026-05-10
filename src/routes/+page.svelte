@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { applyAction, enhance } from '$app/forms';
+  import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
   import QrScanner from '$lib/components/qr-scanner.svelte';
-  import * as localStore from '$lib/local-store';
   import {
     computeDashboardStats,
     computeEnhancedStats,
     exportFilename,
+    localOr,
     parseReceiptUrl,
     toCsv,
     toJson,
     toPdf,
+    useReceipts,
     type ExportFilters
   } from '$lib/receipts';
   import type { ReceiptRecord } from '$lib/types';
@@ -33,23 +33,9 @@
   let exportPreviewTotal = $state(0);
   let exportPreviewLimited = $state(0);
 
-  let localRecords = $state<ReceiptRecord[]>([]);
-  const isLocal = $derived(data.user?.kind === 'local');
-  const records = $derived(isLocal ? localRecords : data.receipts);
-
-  function loadLocal() {
-    localRecords = localStore.list();
-  }
-
-  $effect(() => {
-    if (!browser || !isLocal) return;
-    loadLocal();
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === null || event.key === 'receipts.records.v1') loadLocal();
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  });
+  const store = useReceipts(() => data);
+  const isLocal = $derived(store.kind === 'local');
+  const records = $derived(store.records);
 
   function matchesFilters(record: ReceiptRecord, filters: ExportFilters): boolean {
     if (filters.month && record.urlDate.slice(0, 7) !== filters.month) return false;
@@ -241,23 +227,16 @@
       method="POST"
       action="?/ingest"
       class="import-bar"
-      use:enhance={({ formData, cancel }) => {
+      use:enhance={localOr(data, (formData) => {
         importError = null;
-        if (isLocal) {
-          cancel();
-          const raw = formData.get('source_url')?.toString() ?? '';
-          const metadata = parseReceiptUrl(raw);
-          if (!metadata) {
-            importError = 'Paste or scan a full MEV receipt URL.';
-            return;
-          }
-          goto(`/receipts/new?prefill=${encodeURIComponent(metadata.sourceUrl)}`);
+        const raw = formData.get('source_url')?.toString() ?? '';
+        const metadata = parseReceiptUrl(raw);
+        if (!metadata) {
+          importError = 'Paste or scan a full MEV receipt URL.';
           return;
         }
-        return async ({ result }) => {
-          await applyAction(result);
-        };
-      }}
+        goto(`/receipts/new?prefill=${encodeURIComponent(metadata.sourceUrl)}`);
+      })}
     >
       <input
         bind:this={sourceInput}

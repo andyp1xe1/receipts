@@ -1,54 +1,31 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { goto, invalidateAll } from '$app/navigation';
-  import { applyAction, enhance } from '$app/forms';
+  import { goto } from '$app/navigation';
+  import { enhance } from '$app/forms';
   import * as localStore from '$lib/local-store';
-  import type { ParsedReceipt, ReceiptRecord, ReceiptSummary } from '$lib/types';
+  import { localOr, useReceipt } from '$lib/receipts';
   import { formatCurrency, formatDateTime } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
-  let localRecord = $state<ReceiptRecord | null>(null);
+  const view = useReceipt(() => data, () => data.id);
+  const receipt = $derived(view.receipt);
+
   let localFlash = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  function loadLocal(id: string) {
-    localRecord = localStore.get(id);
-    if (!localRecord && browser) goto('/', { invalidateAll: true });
-  }
-
   $effect(() => {
-    if (data.kind !== 'local' || !browser) return;
-    loadLocal(data.id);
-    const onStorage = (event: StorageEvent) => {
-      if ((event.key === null || event.key === 'receipts.records.v1') && data.kind === 'local') {
-        loadLocal(data.id);
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  });
-
-  function asSummary(record: ReceiptRecord): ReceiptSummary {
-    return { ...record, parsed: JSON.parse(record.rawJson) as ParsedReceipt };
-  }
-
-  const receipt = $derived.by<ReceiptSummary | null>(() => {
-    if (data.kind === 'remote') return data.receipt;
-    return localRecord ? asSummary(localRecord) : null;
+    if (view.kind === 'local' && receipt === null) goto('/');
   });
 
   function handleLocalSave(formData: FormData) {
-    if (data.kind !== 'local') return;
     const category = (formData.get('category')?.toString() ?? '').trim() || null;
     const note = (formData.get('note')?.toString() ?? '').trim() || null;
     localStore.updateMetadata(data.id, { category, note });
-    loadLocal(data.id);
+    view.refresh();
     localFlash = { type: 'success', message: 'Metadata saved.' };
   }
 
-  function handleLocalDelete() {
-    if (data.kind !== 'local') return;
+  function handleLocalDelete(_: FormData) {
     localStore.remove(data.id);
     goto('/', { invalidateAll: true });
   }
@@ -66,7 +43,7 @@
     <h1 class="app-title">Receipt Ledger</h1>
     <div class="header-actions">
       <a class="button-ghost" href="/">Back to ledger</a>
-      {#if data.kind === 'remote'}
+      {#if view.kind === 'remote'}
         <a class="button-ghost" href="/settings/security">Security</a>
       {/if}
       <form method="POST" action="/?/logout">
@@ -216,16 +193,7 @@
             method="POST"
             action="?/save"
             class="panel-body stack"
-            use:enhance={({ formData, cancel }) => {
-              if (data.kind === 'local') {
-                cancel();
-                handleLocalSave(formData);
-                return;
-              }
-              return async ({ result }) => {
-                await applyAction(result);
-              };
-            }}
+            use:enhance={localOr(data, handleLocalSave)}
           >
             <label class="field">
               <span class="label">Category</span>
@@ -247,17 +215,7 @@
             class="panel-body"
             style="padding-top: 0;"
             onsubmit={(e) => { if (!confirm('Delete this receipt permanently?')) e.preventDefault(); }}
-            use:enhance={({ cancel }) => {
-              if (data.kind === 'local') {
-                cancel();
-                handleLocalDelete();
-                return;
-              }
-              return async ({ result }) => {
-                await applyAction(result);
-                if (result.type === 'redirect') await invalidateAll();
-              };
-            }}
+            use:enhance={localOr(data, handleLocalDelete)}
           >
             <button class="button-danger" type="submit">Delete</button>
           </form>

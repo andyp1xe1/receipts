@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, url }) =>
   const duplicate = url.searchParams.get('duplicate') === '1';
 
   if (locals.user?.kind === 'local') {
-    return { kind: 'local' as const, id: params.id, created, duplicate };
+    return { id: params.id, receipt: null, created, duplicate };
   }
 
   const receipt = await getReceiptById(platform, params.id);
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, url }) =>
     throw redirect(303, '/');
   }
 
-  return { kind: 'remote' as const, receipt, created, duplicate };
+  return { id: params.id, receipt, created, duplicate };
 };
 
 export const actions: Actions = {

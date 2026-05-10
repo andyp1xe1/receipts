@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { applyAction, enhance } from '$app/forms';
+  import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
   import * as localStore from '$lib/local-store';
-  import { synthesizeNewReceipt } from '$lib/receipts';
+  import { localOr, synthesizeNewReceipt } from '$lib/receipts';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -72,17 +72,10 @@
         method="POST"
         action="?/save"
         class="panel-body stack"
-        use:enhance={({ formData, cancel }) => {
+        use:enhance={localOr(data, (formData) => {
           localError = null;
-          if (data.user?.kind === 'local') {
-            cancel();
-            handleLocal(formData);
-            return;
-          }
-          return async ({ result }) => {
-            await applyAction(result);
-          };
-        }}
+          handleLocal(formData);
+        })}
       >
         {#if flash?.message}
           <div class={`alert compact ${flash.type === 'error' ? 'error' : 'success'}`}>{flash.message}</div>
