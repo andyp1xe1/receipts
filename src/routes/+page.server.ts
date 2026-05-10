@@ -1,7 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptCategories, listReceipts } from '$lib/server/db/receipts';
-import { getDashboardStats, getEnhancedStats } from '$lib/server/db/stats';
+import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptsForExport } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
 import { fetchAndParseReceipt } from '$lib/server/mev/mev';
 import { normalizeReceiptSource } from '$lib/utils/receipt-source';
@@ -17,37 +16,11 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
     : 'monthly';
 
   if (locals.user?.kind === 'local') {
-    return {
-      month,
-      category,
-      period,
-      kind: 'local' as const,
-      receipts: [],
-      stats: { totalSpend: 0, receiptCount: 0, topCategories: [], monthlySpend: [] },
-      enhancedStats: { period, periodTotals: [], categoryByPeriod: [] },
-      categories: [],
-      exportCategories: []
-    };
+    return { month, category, period, kind: 'local' as const, receipts: [] };
   }
 
-  const [receipts, stats, enhancedStats, exportCategories] = await Promise.all([
-    listReceipts(platform, { month, category }),
-    getDashboardStats(platform),
-    getEnhancedStats(platform, period),
-    listReceiptCategories(platform)
-  ]);
-
-  return {
-    month,
-    category,
-    period,
-    kind: 'remote' as const,
-    receipts,
-    stats,
-    enhancedStats,
-    categories: [...new Set(receipts.map((receipt) => receipt.category || 'Unsorted'))],
-    exportCategories
-  };
+  const receipts = await listReceiptsForExport(platform, {});
+  return { month, category, period, kind: 'remote' as const, receipts };
 };
 
 export const actions: Actions = {

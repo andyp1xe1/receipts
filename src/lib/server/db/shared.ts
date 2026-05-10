@@ -10,8 +10,6 @@ export interface ReceiptFilters {
 }
 
 export const nonEmptyCategoryExpr = sql<string>`coalesce(nullif(${receipts.category}, ''), 'Unsorted')`;
-export const monthExpr = sql<string>`substr(${receipts.urlDate}, 1, 7)`;
-export const categorySortExpr = sql`${nonEmptyCategoryExpr} collate nocase`;
 
 export function totalExpr() {
   return sql<number>`coalesce(cast(${sum(receipts.total)} as real), 0)`

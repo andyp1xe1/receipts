@@ -4,11 +4,11 @@
   import { goto } from '$app/navigation';
   import QrScanner from '$lib/components/qr-scanner.svelte';
   import * as localStore from '$lib/local-store';
-  import { parseReceiptUrl } from '$lib/receipts';
   import {
     computeDashboardStats,
     computeEnhancedStats,
     exportFilename,
+    parseReceiptUrl,
     toCsv,
     toJson,
     toPdf,
@@ -32,10 +32,10 @@
   let exportLimit = $state('all');
   let exportPreviewTotal = $state(0);
   let exportPreviewLimited = $state(0);
-  let exportPreviewLoading = $state(false);
 
   let localRecords = $state<ReceiptRecord[]>([]);
   const isLocal = $derived(data.user?.kind === 'local');
+  const records = $derived(isLocal ? localRecords : data.receipts);
 
   function loadLocal() {
     localRecords = localStore.list();
@@ -74,23 +74,14 @@
   }
 
   const view = $derived.by(() => {
-    if (isLocal) {
-      const ledgerFilters: ExportFilters = { month: data.month, category: data.category };
-      const filtered = localRecords.filter((record) => matchesFilters(record, ledgerFilters));
-      return {
-        receipts: filtered,
-        stats: computeDashboardStats(localRecords),
-        enhancedStats: computeEnhancedStats(localRecords, data.period),
-        categories: distinctCategories(filtered),
-        exportCategories: distinctCategories(localRecords)
-      };
-    }
+    const ledgerFilters: ExportFilters = { month: data.month, category: data.category };
+    const filtered = records.filter((record) => matchesFilters(record, ledgerFilters));
     return {
-      receipts: data.receipts,
-      stats: data.stats,
-      enhancedStats: data.enhancedStats,
-      categories: data.categories,
-      exportCategories: data.exportCategories
+      receipts: filtered,
+      stats: computeDashboardStats(records),
+      enhancedStats: computeEnhancedStats(records, data.period),
+      categories: distinctCategories(filtered),
+      exportCategories: distinctCategories(records)
     };
   });
 
@@ -130,23 +121,6 @@
     return filters;
   }
 
-  function exportParams(overrides: { pdfMode?: 'compact' | 'full' } = {}): URLSearchParams {
-    const params = new URLSearchParams();
-    const filters = buildExportFilters();
-    if (filters.month) params.set('month', filters.month);
-    if (filters.category) params.set('category', filters.category);
-    if (filters.from) params.set('from', filters.from);
-    if (filters.to) params.set('to', filters.to);
-    if (filters.limit) params.set('limit', String(filters.limit));
-    if (overrides.pdfMode === 'full') params.set('pdf_mode', 'full');
-    return params;
-  }
-
-  function exportUrl(format: string, overrides: { pdfMode?: 'compact' | 'full' } = {}): string {
-    const qs = exportParams(overrides).toString();
-    return `/api/export/${format}${qs ? `?${qs}` : ''}`;
-  }
-
   function downloadBlob(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -158,9 +132,9 @@
     URL.revokeObjectURL(url);
   }
 
-  function exportLocal(format: 'csv' | 'json' | 'pdf', pdfMode: 'compact' | 'full' = 'compact'): void {
+  function exportClient(format: 'csv' | 'json' | 'pdf', pdfMode: 'compact' | 'full' = 'compact'): void {
     const filters: ExportFilters = { ...buildExportFilters(), pdfMode };
-    const matching = localRecords.filter((record) => matchesFilters(record, filters));
+    const matching = records.filter((record) => matchesFilters(record, filters));
     const limited = filters.limit ? matching.slice(0, filters.limit) : matching;
 
     if (format === 'csv') {
@@ -185,7 +159,6 @@
   }
 
   function previewLabel(): string {
-    if (exportPreviewLoading) return 'Checking receipts...';
     if (exportPreviewTotal === exportPreviewLimited) {
       return `${exportPreviewTotal} receipt${exportPreviewTotal === 1 ? '' : 's'} ready`;
     }
@@ -217,43 +190,13 @@
     exportTo = defaultToDate(data.month);
     exportCategory = data.category ?? '';
     exportLimit = 'all';
-    exportPreviewTotal = view.receipts.length;
-    exportPreviewLimited = view.receipts.length;
-    exportPreviewLoading = false;
   });
 
   $effect(() => {
-    if (!browser) return;
-
     const filters = buildExportFilters();
-
-    if (isLocal) {
-      const matching = localRecords.filter((record) => matchesFilters(record, filters));
-      exportPreviewTotal = matching.length;
-      exportPreviewLimited = filters.limit ? Math.min(filters.limit, matching.length) : matching.length;
-      exportPreviewLoading = false;
-      return;
-    }
-
-    const controller = new AbortController();
-    exportPreviewLoading = true;
-
-    window.fetch(`/api/export/preview?${exportParams().toString()}`, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Preview failed');
-        const payload = (await response.json()) as { total: number; limited: number };
-        exportPreviewTotal = payload.total;
-        exportPreviewLimited = payload.limited;
-        exportPreviewLoading = false;
-      })
-      .catch((error) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        exportPreviewTotal = 0;
-        exportPreviewLimited = 0;
-        exportPreviewLoading = false;
-      });
-
-    return () => controller.abort();
+    const matching = records.filter((record) => matchesFilters(record, filters));
+    exportPreviewTotal = matching.length;
+    exportPreviewLimited = filters.limit ? Math.min(filters.limit, matching.length) : matching.length;
   });
 
   function handleScannerResult(value: string) {
@@ -417,17 +360,10 @@
             </div>
 
             <div class="export-actions">
-              {#if isLocal}
-                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('csv')}>Download CSV</button>
-                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('json')}>Download full JSON</button>
-                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('pdf', 'compact')}>Download PDF compact</button>
-                <button class="button-secondary export-link" type="button" onclick={() => exportLocal('pdf', 'full')}>Download PDF full</button>
-              {:else}
-                <a class="button-secondary export-link" href={exportUrl('csv')}>Download CSV</a>
-                <a class="button-secondary export-link" href={exportUrl('json')}>Download full JSON</a>
-                <a class="button-secondary export-link" href={exportUrl('pdf')}>Download PDF compact</a>
-                <a class="button-secondary export-link" href={exportUrl('pdf', { pdfMode: 'full' })}>Download PDF full</a>
-              {/if}
+              <button class="button-secondary export-link" type="button" onclick={() => exportClient('csv')}>Download CSV</button>
+              <button class="button-secondary export-link" type="button" onclick={() => exportClient('json')}>Download full JSON</button>
+              <button class="button-secondary export-link" type="button" onclick={() => exportClient('pdf', 'compact')}>Download PDF compact</button>
+              <button class="button-secondary export-link" type="button" onclick={() => exportClient('pdf', 'full')}>Download PDF full</button>
             </div>
           </div>
         </details>

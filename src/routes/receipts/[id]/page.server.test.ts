@@ -9,6 +9,8 @@ vi.mock('$lib/server/db/receipts', () => ({
 import { actions, load } from './+page.server';
 import { deleteReceipt, getReceiptById, updateReceiptMetadata } from '$lib/server/db/receipts';
 
+const remoteLocals = { user: { kind: 'remote' as const } };
+
 function makeSaveEvent(form: Record<string, string>) {
   const formData = new FormData();
   for (const [key, value] of Object.entries(form)) formData.set(key, value);
@@ -21,7 +23,8 @@ function makeSaveEvent(form: Record<string, string>) {
   return {
     request,
     platform: undefined,
-    params: { id: 'r1' }
+    params: { id: 'r1' },
+    locals: remoteLocals
   } as Parameters<typeof actions.save>[0] & { request: Request };
 }
 
@@ -33,7 +36,8 @@ describe('receipt detail page', () => {
       load({
         params: { id: 'missing' },
         platform: undefined,
-        url: new URL('https://example.test/receipts/missing')
+        url: new URL('https://example.test/receipts/missing'),
+        locals: remoteLocals
       } as Parameters<typeof load>[0])
     ).rejects.toMatchObject({ status: 303, location: '/' });
   });
@@ -44,7 +48,8 @@ describe('receipt detail page', () => {
     const result = await load({
       params: { id: 'r1' },
       platform: undefined,
-      url: new URL('https://example.test/receipts/r1?created=1&duplicate=1')
+      url: new URL('https://example.test/receipts/r1?created=1&duplicate=1'),
+      locals: remoteLocals
     } as Parameters<typeof load>[0]);
 
     expect(result).toMatchObject({
@@ -81,7 +86,7 @@ describe('receipt detail page', () => {
     vi.mocked(deleteReceipt).mockResolvedValue();
 
     await expect(
-      actions.delete({ platform: undefined, params: { id: 'r1' } } as Parameters<typeof actions.delete>[0])
+      actions.delete({ platform: undefined, params: { id: 'r1' }, locals: remoteLocals } as Parameters<typeof actions.delete>[0])
     ).rejects.toMatchObject({ status: 303, location: '/' });
   });
 
@@ -90,7 +95,8 @@ describe('receipt detail page', () => {
 
     const result = await actions.delete({
       platform: undefined,
-      params: { id: 'r1' }
+      params: { id: 'r1' },
+      locals: remoteLocals
     } as Parameters<typeof actions.delete>[0]);
 
     expect(result).toMatchObject({
