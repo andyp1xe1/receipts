@@ -16,7 +16,7 @@
     useReceipts,
     type ExportFilters
   } from '$lib/receipts';
-  import { formatCurrency, formatMonthLabel, formatDateTime, formatPeriodLabel, slugCategory } from '$lib/utils/format';
+  import { formatCurrency, formatDate, formatDateTime, formatMonthLabel, formatPeriodLabel, slugCategory } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -413,21 +413,24 @@
           <div class="receipt-list">
             {#if view.receipts.length}
               {#each view.receipts as receipt}
+                {@const manual = receipt.eccId === 'manual'}
                 <a class="receipt-row" href={`/receipts/${receipt.id}`}>
                   <div>
                      <h3 class="receipt-name">{receipt.merchantName}</h3>
                      <div class="meta-row detail-meta">
-                       <span>{formatDateTime(receipt.issuedAt)}</span>
+                       <span>{manual ? formatDate(receipt.urlDate) : formatDateTime(receipt.issuedAt)}</span>
                        <span>{receipt.category || 'Unsorted'}</span>
-                       <span>ECC {receipt.eccId}</span>
-                       <span>#{receipt.urlReceiptNumber}</span>
+                       {#if !manual}
+                         <span>ECC {receipt.eccId}</span>
+                         <span>#{receipt.urlReceiptNumber}</span>
+                       {/if}
                      </div>
                    </div>
                   <div class="amount">{formatCurrency(receipt.total)}</div>
                 </a>
               {/each}
             {:else}
-              <div class="empty-state">Paste your first MEV URL to start the ledger.</div>
+              <div class="empty-state">Add your first receipt — paste a URL or use Add manually.</div>
             {/if}
           </div>
         </section>

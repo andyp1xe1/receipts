@@ -3,13 +3,27 @@
   import { enhance } from '$app/forms';
   import * as localStore from '$lib/local-store';
   import { formField, localOr, useReceipt } from '$lib/receipts';
-  import { formatCurrency, formatDateTime } from '$lib/utils/format';
+  import { formatCurrency, formatDate, formatDateTime } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
   const view = useReceipt(() => data, () => data.id);
   const receipt = $derived(view.receipt);
+
+  const isManual = $derived(receipt?.eccId === 'manual');
+  const hasSource = $derived(!!receipt?.sourceUrl);
+  const hasItems = $derived((receipt?.parsed.items.length ?? 0) > 0);
+  const hasTaxes = $derived((receipt?.parsed.taxes.length ?? 0) > 0);
+  const hasPayments = $derived(
+    receipt
+      ? receipt.parsed.payments.card !== null ||
+        receipt.parsed.payments.cashGiven !== null ||
+        receipt.parsed.payments.change !== null ||
+        Object.keys(receipt.parsed.payments.other).length > 0
+      : false
+  );
+  const hasAscii = $derived(!!receipt?.parsed.asciiReceipt);
 
   let localFlash = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -63,7 +77,7 @@
     <div class="detail-shell">
       <main class="stack">
         {#if data.created}
-          <div class="alert compact success">Receipt imported and stored.</div>
+          <div class="alert compact success">Receipt saved.</div>
         {/if}
 
         {#if data.duplicate}
@@ -80,9 +94,11 @@
               <div>
                 <h2 class="detail-title">{receipt.merchantName}</h2>
                 <div class="meta-row detail-meta">
-                  <span>{formatDateTime(receipt.issuedAt)}</span>
-                  <span>ECC {receipt.eccId}</span>
-                  <span>Receipt #{receipt.urlReceiptNumber}</span>
+                  <span>{isManual ? formatDate(receipt.urlDate) : formatDateTime(receipt.issuedAt)}</span>
+                  {#if !isManual}
+                    <span>ECC {receipt.eccId}</span>
+                    <span>Receipt #{receipt.urlReceiptNumber}</span>
+                  {/if}
                 </div>
               </div>
               <div class="detail-total">{formatCurrency(receipt.total)}</div>
@@ -90,102 +106,112 @@
           </div>
         </section>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Line items</h2>
-          </div>
-          <div class="panel-body">
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Qty x unit</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each receipt.parsed.items as item}
+        {#if hasItems}
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Line items</h2>
+            </div>
+            <div class="panel-body">
+              <table class="items-table">
+                <thead>
                   <tr>
-                    <td><strong>{item.name}</strong></td>
-                    <td>{item.quantity.toFixed(3)} x {item.unitPrice.toFixed(2)}</td>
-                    <td>{formatCurrency(item.total)}</td>
+                    <th>Item</th>
+                    <th>Qty x unit</th>
+                    <th>Total</th>
                   </tr>
+                </thead>
+                <tbody>
+                  {#each receipt.parsed.items as item}
+                    <tr>
+                      <td><strong>{item.name}</strong></td>
+                      <td>{item.quantity.toFixed(3)} x {item.unitPrice.toFixed(2)}</td>
+                      <td>{formatCurrency(item.total)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        {/if}
+
+        {#if hasTaxes || hasPayments}
+          <div class="two-column">
+            {#if hasTaxes}
+              <div class="compact-section">
+                <strong>Taxes</strong>
+                {#each receipt.parsed.taxes as tax}
+                  <div class="spaced">
+                    <span>{tax.label}</span>
+                    <strong>{formatCurrency(tax.amount)}</strong>
+                  </div>
                 {/each}
-              </tbody>
-            </table>
-          </div>
-        </section>
+              </div>
+            {/if}
 
-        <div class="two-column">
-          <div class="compact-section">
-            <strong>Taxes</strong>
-            {#if receipt.parsed.taxes.length}
-              {#each receipt.parsed.taxes as tax}
-                <div class="spaced">
-                  <span>{tax.label}</span>
-                  <strong>{formatCurrency(tax.amount)}</strong>
+            {#if hasPayments}
+              <div class="compact-section">
+                <strong>Payments</strong>
+                {#if receipt.parsed.payments.card !== null}
+                  <div class="spaced"><span>Card</span><strong>{formatCurrency(receipt.parsed.payments.card)}</strong></div>
+                {/if}
+                {#if receipt.parsed.payments.cashGiven !== null}
+                  <div class="spaced"><span>Cash given</span><strong>{formatCurrency(receipt.parsed.payments.cashGiven)}</strong></div>
+                {/if}
+                {#if receipt.parsed.payments.change !== null}
+                  <div class="spaced"><span>Change</span><strong>{formatCurrency(receipt.parsed.payments.change)}</strong></div>
+                {/if}
+                {#each Object.entries(receipt.parsed.payments.other) as [label, amount]}
+                  <div class="spaced"><span>{label}</span><strong>{formatCurrency(amount)}</strong></div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if hasSource || hasAscii}
+          <div class="detail-bottom-row">
+            {#if hasSource}
+              <section class="panel">
+                <div class="panel-header">
+                  <h3 class="panel-title">Source details</h3>
                 </div>
-              {/each}
-            {:else}
-              <div class="muted">No explicit tax lines.</div>
+                <div class="panel-body stack-sm">
+                  <div class="meta-grid">
+                    <div class="meta-label">Source URL</div>
+                    <div class="meta-value">{receipt.sourceUrl}</div>
+                  </div>
+                  <div class="meta-grid">
+                    <div class="meta-label">ECC</div>
+                    <div class="meta-value">{receipt.eccId}</div>
+                  </div>
+                  <div class="meta-grid">
+                    <div class="meta-label">URL total</div>
+                    <div class="meta-value">{receipt.urlTotal}</div>
+                  </div>
+                  <div class="meta-grid">
+                    <div class="meta-label">Receipt number</div>
+                    <div class="meta-value">{receipt.urlReceiptNumber}</div>
+                  </div>
+                  <div class="meta-grid">
+                    <div class="meta-label">Date</div>
+                    <div class="meta-value">{receipt.urlDate}</div>
+                  </div>
+                </div>
+              </section>
+            {/if}
+
+            {#if hasAscii}
+              <section class="panel">
+                <div class="panel-header">
+                  <h3 class="panel-title">Raw receipt</h3>
+                </div>
+                <div class="panel-body ascii-body">
+                  <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
+                </div>
+              </section>
             {/if}
           </div>
-
-          <div class="compact-section">
-            <strong>Payments</strong>
-            {#if receipt.parsed.payments.card !== null}
-              <div class="spaced"><span>Card</span><strong>{formatCurrency(receipt.parsed.payments.card)}</strong></div>
-            {/if}
-            {#if receipt.parsed.payments.cashGiven !== null}
-              <div class="spaced"><span>Cash given</span><strong>{formatCurrency(receipt.parsed.payments.cashGiven)}</strong></div>
-            {/if}
-            {#if receipt.parsed.payments.change !== null}
-              <div class="spaced"><span>Change</span><strong>{formatCurrency(receipt.parsed.payments.change)}</strong></div>
-            {/if}
-            {#each Object.entries(receipt.parsed.payments.other) as [label, amount]}
-              <div class="spaced"><span>{label}</span><strong>{formatCurrency(amount)}</strong></div>
-            {/each}
-          </div>
-        </div>
-
-        <div class="detail-bottom-row">
-          <section class="panel">
-            <div class="panel-header">
-              <h3 class="panel-title">Source details</h3>
-            </div>
-            <div class="panel-body stack-sm">
-              <div class="meta-grid">
-                <div class="meta-label">Source URL</div>
-                <div class="meta-value">{receipt.sourceUrl}</div>
-              </div>
-              <div class="meta-grid">
-                <div class="meta-label">ECC</div>
-                <div class="meta-value">{receipt.eccId}</div>
-              </div>
-              <div class="meta-grid">
-                <div class="meta-label">URL total</div>
-                <div class="meta-value">{receipt.urlTotal}</div>
-              </div>
-              <div class="meta-grid">
-                <div class="meta-label">Receipt number</div>
-                <div class="meta-value">{receipt.urlReceiptNumber}</div>
-              </div>
-              <div class="meta-grid">
-                <div class="meta-label">Date</div>
-                <div class="meta-value">{receipt.urlDate}</div>
-              </div>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <h3 class="panel-title">Raw receipt</h3>
-            </div>
-            <div class="panel-body ascii-body">
-              <pre class="ascii">{receipt.parsed.asciiReceipt}</pre>
-            </div>
-          </section>
-        </div>
+        {/if}
       </main>
 
       <aside class="stack">
