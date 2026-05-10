@@ -26,9 +26,7 @@
       <p class="auth-copy">Use it locally in your browser, or sign in to the synced account.</p>
     </div>
 
-    {#if data.hasRemoteBackend && !data.migrated}
-      <div class="alert error">Run the auth migration before signing in.</div>
-    {:else if data.authUnavailable}
+    {#if data.authUnavailable}
       <div class="alert error">Authentication is temporarily unavailable.</div>
     {/if}
 
@@ -43,7 +41,7 @@
       <p class="auth-copy">Receipts stay in this browser. Nothing leaves your device.</p>
     </div>
 
-    {#if data.hasRemoteBackend}
+    {#if data.remoteReady}
       <div class="auth-divider">or sign in to the synced account</div>
 
       <form method="POST" class="stack">
@@ -59,6 +57,12 @@
 
         <button class="button-secondary auth-submit" type="submit">Sign in</button>
       </form>
+    {:else if data.needsAdmin}
+      <div class="auth-divider">or set up the synced account</div>
+      <a class="button-secondary auth-submit" href="/setup">Create the admin account</a>
+    {:else if data.needsMigration}
+      <div class="auth-divider">synced account not available yet</div>
+      <p class="auth-copy">Run the auth migration before the synced backend is ready.</p>
     {/if}
   </section>
 </div>

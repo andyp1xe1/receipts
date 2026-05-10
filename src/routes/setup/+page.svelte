@@ -58,5 +58,7 @@
         Create account
       </button>
     </form>
+
+    <a class="auth-copy" href="/login">Back to sign in</a>
   </section>
 </div>

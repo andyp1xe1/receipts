@@ -94,23 +94,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  if (!event.locals.authTablesReady) {
-    if (pathname !== '/setup') {
-      throw redirect(303, '/setup?migrate=1');
-    }
-
-    return resolve(event);
-  }
-
-  if (!event.locals.authSetupComplete) {
-    if (pathname !== '/setup') {
-      throw redirect(303, '/setup');
-    }
-
-    return resolve(event);
-  }
-
-  if (pathname === '/setup') {
+  if (pathname === '/setup' && event.locals.authSetupComplete) {
     throw redirect(303, event.locals.user ? '/' : '/login');
   }
 
