@@ -2,22 +2,21 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createAuth } from '$lib/server/auth/auth';
 import { authErrorMessage, isHttpControlFlow } from '$lib/server/auth/errors';
+import { getFormString } from '$lib/server/forms';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
-  if (!locals.authTablesReady) {
-    return { migrated: false };
-  }
-
-  if (!locals.authSetupComplete) {
-    throw redirect(303, '/setup');
-  }
-
+export const load: PageServerLoad = async ({ locals, platform, url }) => {
   if (locals.user) {
     throw redirect(303, '/');
   }
 
+  const hasRemoteBackend = !!platform?.env.DB;
+  const remoteReady = hasRemoteBackend && locals.authTablesReady && locals.authSetupComplete;
+
   return {
-    migrated: true,
+    hasRemoteBackend,
+    remoteReady,
+    needsMigration: hasRemoteBackend && !locals.authTablesReady,
+    needsAdmin: hasRemoteBackend && locals.authTablesReady && !locals.authSetupComplete,
     authUnavailable: url.searchParams.get('auth') === 'unavailable'
   };
 };
@@ -31,8 +30,8 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const email = String(formData.get('email') ?? '').trim().toLowerCase();
-    const password = String(formData.get('password') ?? '');
+    const email = getFormString(formData, 'email').trim().toLowerCase();
+    const password = getFormString(formData, 'password');
 
     if (!email || !password) {
       return fail(400, {

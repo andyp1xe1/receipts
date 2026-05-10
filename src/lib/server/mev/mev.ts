@@ -1,7 +1,6 @@
 import type { ParsedReceipt, Payments, ReceiptItem, TaxLine } from '$lib/types';
 import { formatMoney } from '$lib/utils/format';
 
-const moneyPattern = /^-?\d+(?:[.,]\d{1,2})?$/;
 const moneySuffixPattern = /^(?<amount>\d+(?:[.,]\d{1,2})?)(?:\s+[A-Z_]+)?$/;
 const qtyPricePattern = /^(?<qty>\d+(?:[.,]\d+)?)\s*x\s*(?<unit>\d+(?:[.,]\d{1,2})?)$/i;
 const datePattern = /DATA\s+(?<date>\d{2}\.\d{2}\.\d{4})/i;
@@ -59,7 +58,7 @@ function moneyValue(line: string | undefined): number | null {
 
 function isSeparator(line: string): boolean {
   const stripped = line.trim();
-  return stripped.length >= 6 && [...stripped].every((char) => '-_`=.~*'.includes(char));
+  return /^[-_`=.~*]{6,}$/.test(stripped);
 }
 
 function nextValue(lines: string[], index: number): string | null {
@@ -428,15 +427,17 @@ export async function fetchReceiptHtml(url: string, init?: RequestInit): Promise
   let lastStatus: number | null = null;
 
   for (const candidateUrl of receiptFetchCandidates(url)) {
+    const headers = new Headers(init?.headers);
+    for (const [key, value] of Object.entries(browserLikeHeaders)) {
+      headers.set(key, value);
+    }
+    headers.set('referer', new URL(candidateUrl).origin + '/');
+
     const response = await fetch(candidateUrl, {
       ...init,
       method: 'GET',
       redirect: 'follow',
-      headers: {
-        ...browserLikeHeaders,
-        ...(init?.headers ?? {}),
-        referer: new URL(candidateUrl).origin + '/'
-      }
+      headers
     });
 
     if (response.ok) {

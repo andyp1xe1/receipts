@@ -1,11 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptCategories, listReceipts } from '$lib/server/db/receipts';
-import { getDashboardStats, getEnhancedStats } from '$lib/server/db/stats';
+import { createAuth } from '$lib/server/auth/auth';
+import { clearLocalSession, hasLocalSession } from '$lib/server/auth/local-session';
+import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptsForExport } from '$lib/server/db/receipts';
+import { getFormString } from '$lib/server/forms';
 import { fetchAndParseReceipt } from '$lib/server/mev/mev';
 import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 
-export const load: PageServerLoad = async ({ platform, url }) => {
+export const load: PageServerLoad = async ({ locals, platform, url }) => {
   const month = url.searchParams.get('month');
   const category = url.searchParams.get('category');
   const periodParam = url.searchParams.get('period');
@@ -15,31 +17,23 @@ export const load: PageServerLoad = async ({ platform, url }) => {
     ? (periodParam as 'weekly' | 'monthly' | 'yearly')
     : 'monthly';
 
-  const [receipts, stats, enhancedStats, exportCategories] = await Promise.all([
-    listReceipts(platform, { month, category }),
-    getDashboardStats(platform),
-    getEnhancedStats(platform, period),
-    listReceiptCategories(platform)
-  ]);
+  if (locals.user?.kind === 'local') {
+    return { month, category, period, kind: 'local' as const, receipts: [] };
+  }
 
-  return {
-    month,
-    category,
-    period,
-    receipts,
-    stats,
-    enhancedStats,
-    categories: [...new Set(receipts.map((receipt) => receipt.category || 'Unsorted'))],
-    exportCategories
-  };
+  const receipts = await listReceiptsForExport(platform, {});
+  return { month, category, period, kind: 'remote' as const, receipts };
 };
 
 export const actions: Actions = {
-  ingest: async ({ request, platform }) => {
+  ingest: async ({ locals, request, platform }) => {
+    if (locals.user?.kind === 'local') {
+      return fail(400, { type: 'error', message: 'Local mode handles imports in the browser.' });
+    }
     const formData = await request.formData();
-    const sourceUrl = String(formData.get('source_url') ?? '').trim();
-    const category = String(formData.get('category') ?? '').trim() || null;
-    const note = String(formData.get('note') ?? '').trim() || null;
+    const sourceUrl = getFormString(formData, 'source_url').trim();
+    const category = getFormString(formData, 'category').trim() || null;
+    const note = getFormString(formData, 'note').trim() || null;
     const values = {
       source_url: sourceUrl,
       category: category ?? '',
@@ -75,5 +69,16 @@ export const actions: Actions = {
     }
 
     throw redirect(303, destination);
+  },
+
+  logout: async (event) => {
+    if (hasLocalSession(event.cookies)) {
+      clearLocalSession(event.cookies);
+    } else if (event.locals.authTablesReady) {
+      await createAuth(event).api.signOut({
+        headers: event.request.headers
+      });
+    }
+    throw redirect(303, '/login');
   }
 };

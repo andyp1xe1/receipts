@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import AppHeader from '$lib/components/app-header.svelte';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -21,15 +22,7 @@
 </svelte:head>
 
 <div class="app-shell">
-  <header class="app-header">
-    <h1 class="app-title">Security</h1>
-    <div class="header-actions">
-      <a class="button-ghost" href="/">Back to ledger</a>
-      <form method="POST" action="/logout">
-        <button class="button-ghost" type="submit">Sign out</button>
-      </form>
-    </div>
-  </header>
+  <AppHeader user={data.user} back title="Security" showSecurity={false} />
 
   <div class="stack settings-body page-column">
     {#if data.welcome}
@@ -74,7 +67,7 @@
       </form>
     </section>
 
-    {#if data.user?.twoFactorEnabled}
+    {#if data.user?.kind === 'remote' && data.user.twoFactorEnabled}
       <section class="panel panel-body stack-sm">
         <div>
           <h2 class="panel-title">Two-factor authentication is on</h2>

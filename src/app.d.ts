@@ -13,11 +13,15 @@ declare global {
       };
     }
 
+    type LocalUser = { kind: 'local' };
+    type RemoteUser = { kind: 'remote' } & AuthSession['user'];
+    type AppUser = LocalUser | RemoteUser;
+
     interface Locals {
       authSetupComplete: boolean;
       authTablesReady: boolean;
       session: AuthSession['session'] | null;
-      user: AuthSession['user'] | null;
+      user: AppUser | null;
     }
   }
 }

@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import type { Actions, PageServerLoad } from './$types';
 import { createAuth } from '$lib/server/auth/auth';
 import { authErrorMessage, isHttpControlFlow } from '$lib/server/auth/errors';
+import { getFormString } from '$lib/server/forms';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   if (!locals.user) {
@@ -23,9 +24,9 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const currentPassword = String(formData.get('current_password') ?? '');
-    const newPassword = String(formData.get('new_password') ?? '');
-    const confirmPassword = String(formData.get('confirm_password') ?? '');
+    const currentPassword = getFormString(formData, 'current_password');
+    const newPassword = getFormString(formData, 'new_password');
+    const confirmPassword = getFormString(formData, 'confirm_password');
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       return fail(400, {
@@ -75,7 +76,7 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const password = String(formData.get('password') ?? '');
+    const password = getFormString(formData, 'password');
 
     if (!password) {
       return fail(400, {
@@ -111,7 +112,7 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const code = String(formData.get('code') ?? '').trim();
+    const code = getFormString(formData, 'code').trim();
     const trustDevice = formData.get('trust_device') === 'on';
 
     if (!code) {
@@ -144,7 +145,7 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const password = String(formData.get('password') ?? '');
+    const password = getFormString(formData, 'password');
 
     if (!password) {
       return fail(400, {
@@ -178,7 +179,7 @@ export const actions: Actions = {
     }
 
     const formData = await event.request.formData();
-    const password = String(formData.get('password') ?? '');
+    const password = getFormString(formData, 'password');
 
     if (!password) {
       return fail(400, {

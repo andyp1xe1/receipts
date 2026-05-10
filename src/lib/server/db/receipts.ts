@@ -1,57 +1,16 @@
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { ParsedReceipt, ReceiptRecord, ReceiptSummary } from '$lib/types';
 import { getDb } from './db';
-import { nonEmptyCategoryExpr, receipts } from './schema';
+import { receipts } from './schema';
 import {
   buildReceiptWhere,
-  categorySortExpr,
   parseReceiptRecord,
-  parseReceiptRecords,
   type ReceiptFilters
 } from './shared';
-
-export async function listReceipts(
-  platform: App.Platform | undefined,
-  filters: ReceiptFilters = {}
-): Promise<ReceiptSummary[]> {
-  return parseReceiptRecords(await queryReceipts(platform, filters, { limit: 100 }));
-}
 
 export async function listReceiptsForExport(
   platform: App.Platform | undefined,
   filters: ReceiptFilters = {},
-  options: { limit?: number | null } = {}
-): Promise<ReceiptRecord[]> {
-  return queryReceipts(platform, filters, { limit: options.limit ?? null });
-}
-
-export async function countReceipts(
-  platform: App.Platform | undefined,
-  filters: ReceiptFilters = {}
-): Promise<number> {
-  const result = await getDb(platform)
-    .select({ count: count() })
-    .from(receipts)
-    .where(buildReceiptWhere(filters))
-    .get();
-
-  return result?.count ?? 0;
-}
-
-export async function listReceiptCategories(platform: App.Platform | undefined): Promise<string[]> {
-  const result = await getDb(platform)
-    .select({ category: nonEmptyCategoryExpr })
-    .from(receipts)
-    .groupBy(nonEmptyCategoryExpr)
-    .orderBy(categorySortExpr)
-    .all();
-
-  return result.map((row) => row.category);
-}
-
-async function queryReceipts(
-  platform: App.Platform | undefined,
-  filters: ReceiptFilters,
   options: { limit?: number | null } = {}
 ): Promise<ReceiptRecord[]> {
   const baseQuery = getDb(platform)

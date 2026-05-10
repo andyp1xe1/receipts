@@ -5,6 +5,25 @@ import { loadPrivateReceiptCorpus } from './private-receipt-corpus';
 
 const corpus = loadPrivateReceiptCorpus();
 
+function assertFourPartTuple(sourceUrl: string, receipt: Awaited<ReturnType<typeof fetchAndParseReceipt>>) {
+  const parts = sourceUrl.replace(/\/+$/, '').split('/').slice(-4);
+
+  expect(receipt.eccId).toBe(parts[0]);
+  expect(receipt.urlTotal).toBe(parts[1]);
+  expect(receipt.urlReceiptNumber).toBe(String(Number(parts[2])));
+  expect(receipt.urlDate).toBe(parts[3]);
+}
+
+function assertKnownUrlShape(kind: 'four_part' | 'opaque_lookup' | undefined, sourceUrl: string) {
+  expect(kind === 'four_part' || kind === 'opaque_lookup').toBe(true);
+  expect(sourceUrl.includes('/receipt/') || sourceUrl.includes('/receipt-verifier/')).toBe(true);
+
+  const segments = sourceUrl.replace(/\/+$/, '').split('/');
+  const hasValidTail = kind === 'four_part' ? segments.slice(-4).length === 4 : Boolean(segments.at(-1));
+
+  expect(hasValidTail).toBe(true);
+}
+
 describe.skipIf(!corpus)('private MEV receipt corpus', () => {
   it('round-trips the canonical receipt invariants', async () => {
     for (const entry of corpus ?? []) {
@@ -21,12 +40,7 @@ describe.skipIf(!corpus)('private MEV receipt corpus', () => {
       expect(receipt.issuedAt?.slice(0, 10)).toBe(receipt.urlDate);
 
       if (entry.kind === 'four_part') {
-        const parts = entry.source_url.replace(/\/+$/, '').split('/').slice(-4);
-
-        expect(receipt.eccId).toBe(parts[0]);
-        expect(receipt.urlTotal).toBe(parts[1]);
-        expect(receipt.urlReceiptNumber).toBe(String(Number(parts[2])));
-        expect(receipt.urlDate).toBe(parts[3]);
+        assertFourPartTuple(entry.source_url, receipt);
       }
     }
   }, 15000);
@@ -44,18 +58,7 @@ describe.skipIf(!corpus)('private MEV receipt corpus', () => {
 
   it('uses only known MEV URL shapes', () => {
     for (const entry of corpus ?? []) {
-      const url = entry.source_url;
-
-      expect(entry.kind === 'four_part' || entry.kind === 'opaque_lookup').toBe(true);
-      expect(url.includes('/receipt/') || url.includes('/receipt-verifier/')).toBe(true);
-
-      if (entry.kind === 'four_part') {
-        expect(url.replace(/\/+$/, '').split('/').slice(-4)).toHaveLength(4);
-        continue;
-      }
-
-      const token = url.replace(/\/+$/, '').split('/').at(-1);
-      expect(token).toBeTruthy();
+      assertKnownUrlShape(entry.kind, entry.source_url);
     }
   });
 });

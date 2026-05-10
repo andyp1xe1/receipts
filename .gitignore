@@ -13,3 +13,6 @@ coverage/
 tests/private/
 __pycache__/
 *.pyc
+
+# Localflare generated files
+.localflare/

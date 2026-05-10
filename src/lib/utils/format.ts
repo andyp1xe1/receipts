@@ -21,6 +21,11 @@ export function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
+export function formatDate(value: string | null): string {
+  if (!value) return 'Unknown date';
+  return new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(value));
+}
+
 export function slugCategory(value: string | null): string {
   return value && value.trim() ? value : 'Unsorted';
 }

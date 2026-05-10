@@ -13,10 +13,17 @@
 
 <div class="auth-shell">
   <section class="auth-card stack">
+    <div class="auth-empty auth-empty-top">
+      <svg class="empty-art" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M60 18 L66 50 L98 56 L66 62 L60 94 L54 62 L22 56 L54 50 Z" />
+        <path d="M92 26 L94 32 L100 34 L94 36 L92 42 L90 36 L84 34 L90 32 Z" fill="currentColor" stroke="none" opacity="0.55" />
+        <path d="M26 80 L27 84 L31 85 L27 86 L26 90 L25 86 L21 85 L25 84 Z" fill="currentColor" stroke="none" opacity="0.55" />
+      </svg>
+    </div>
     <div class="stack-sm">
       <div class="eyebrow">First run</div>
       <h1 class="auth-title">Create the admin account</h1>
-      <p class="auth-copy">Receipt Ledger stays private and single-user by default.</p>
+      <p class="auth-copy">A fresh ledger, waiting for its first keeper. Receipt Ledger stays private and single-user by default.</p>
     </div>
 
     {#if !data.migrated}
@@ -58,5 +65,7 @@
         Create account
       </button>
     </form>
+
+    <a class="auth-copy" href="/login">Back to sign in</a>
   </section>
 </div>
