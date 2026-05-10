@@ -1,6 +1,9 @@
 import { and, eq, gte, lte, sql, sum, type SQL } from 'drizzle-orm';
-import type { ParsedReceipt, ReceiptRecord, ReceiptSummary } from '$lib/types';
+import { parseReceiptRecord } from '$lib/receipts/record';
+import type { ReceiptRecord, ReceiptSummary } from '$lib/types';
 import { receipts } from './schema';
+
+export { parseReceiptRecord };
 
 export interface ReceiptFilters {
   month?: string | null;
@@ -13,13 +16,6 @@ export const nonEmptyCategoryExpr = sql<string>`coalesce(nullif(${receipts.categ
 
 export function totalExpr() {
   return sql<number>`coalesce(cast(${sum(receipts.total)} as real), 0)`
-}
-
-export function parseReceiptRecord(record: ReceiptRecord): ReceiptSummary {
-  return {
-    ...record,
-    parsed: JSON.parse(record.rawJson) as ParsedReceipt
-  };
 }
 
 export function parseReceiptRecords(records: ReceiptRecord[]): ReceiptSummary[] {

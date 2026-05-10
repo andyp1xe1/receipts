@@ -2,7 +2,7 @@
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
   import * as localStore from '$lib/local-store';
-  import { localOr, synthesizeNewReceipt } from '$lib/receipts';
+  import { formField, localOr, synthesizeNewReceipt } from '$lib/receipts';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -21,10 +21,10 @@
 
   function handleLocal(formData: FormData) {
     const input = {
-      merchantName: (formData.get('merchant_name')?.toString() ?? '').trim(),
-      total: (formData.get('total')?.toString() ?? '').trim(),
-      urlDate: (formData.get('url_date')?.toString() ?? '').trim(),
-      sourceUrl: (formData.get('source_url')?.toString() ?? '').trim() || undefined
+      merchantName: formField(formData, 'merchant_name'),
+      total: formField(formData, 'total'),
+      urlDate: formField(formData, 'url_date'),
+      sourceUrl: formField(formData, 'source_url') || undefined
     };
 
     if (!input.merchantName || !input.total || !input.urlDate) {
@@ -39,11 +39,10 @@
       return;
     }
 
-    const metadata = {
-      category: (formData.get('category')?.toString() ?? '').trim() || null,
-      note: (formData.get('note')?.toString() ?? '').trim() || null
-    };
-    const id = localStore.create(parsed, metadata);
+    const id = localStore.create(parsed, {
+      category: formField(formData, 'category') || null,
+      note: formField(formData, 'note') || null
+    });
     goto(`/receipts/${id}?created=1`, { invalidateAll: true });
   }
 

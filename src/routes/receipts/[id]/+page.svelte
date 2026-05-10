@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { enhance } from '$app/forms';
   import * as localStore from '$lib/local-store';
-  import { localOr, useReceipt } from '$lib/receipts';
+  import { formField, localOr, useReceipt } from '$lib/receipts';
   import { formatCurrency, formatDateTime } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
@@ -18,9 +18,10 @@
   });
 
   function handleLocalSave(formData: FormData) {
-    const category = (formData.get('category')?.toString() ?? '').trim() || null;
-    const note = (formData.get('note')?.toString() ?? '').trim() || null;
-    localStore.updateMetadata(data.id, { category, note });
+    localStore.updateMetadata(data.id, {
+      category: formField(formData, 'category') || null,
+      note: formField(formData, 'note') || null
+    });
     view.refresh();
     localFlash = { type: 'success', message: 'Metadata saved.' };
   }

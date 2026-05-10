@@ -1,9 +1,9 @@
 import { browser } from '$app/environment';
 import { invalidateAll } from '$app/navigation';
+import { STORAGE_KEY } from '$lib/local-store';
 import * as localStore from '$lib/local-store';
-import type { ParsedReceipt, ReceiptRecord, ReceiptSummary } from '$lib/types';
-
-const STORAGE_KEY = 'receipts.records.v1';
+import type { ReceiptRecord, ReceiptSummary } from '$lib/types';
+import { parseReceiptRecord } from './record';
 
 interface UserContext {
   user?: { kind: 'local' | 'remote' } | null;
@@ -38,14 +38,8 @@ function listenForLocalChanges(reload: () => void): () => void {
   return () => window.removeEventListener('storage', onStorage);
 }
 
-function asSummary(record: ReceiptRecord): ReceiptSummary {
-  return { ...record, parsed: JSON.parse(record.rawJson) as ParsedReceipt };
-}
-
 export function useReceipts(getData: () => ListContext): ReceiptsView {
-  const kind = $derived<'local' | 'remote'>(
-    getData().user?.kind === 'local' ? 'local' : 'remote'
-  );
+  const kind = $derived(getData().user?.kind ?? 'remote');
   let local = $state<ReceiptRecord[]>([]);
 
   $effect(() => {
@@ -74,9 +68,7 @@ export function useReceipts(getData: () => ListContext): ReceiptsView {
 }
 
 export function useReceipt(getData: () => DetailContext, getId: () => string): ReceiptView {
-  const kind = $derived<'local' | 'remote'>(
-    getData().user?.kind === 'local' ? 'local' : 'remote'
-  );
+  const kind = $derived(getData().user?.kind ?? 'remote');
   let local = $state<ReceiptRecord | null>(null);
 
   $effect(() => {
@@ -94,7 +86,7 @@ export function useReceipt(getData: () => DetailContext, getId: () => string): R
     },
     get receipt() {
       if (kind === 'remote') return getData().receipt ?? null;
-      return local ? asSummary(local) : null;
+      return local ? parseReceiptRecord(local) : null;
     },
     refresh() {
       if (kind === 'local') {

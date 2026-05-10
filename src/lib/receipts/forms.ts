@@ -5,20 +5,19 @@ interface UserContext {
   user?: { kind: 'local' | 'remote' } | null;
 }
 
-/**
- * Returns a `use:enhance` SubmitFunction that runs the given local handler
- * for local users (cancelling the form post) and falls back to the server
- * action via `applyAction` for remote users. Keeps the local/remote branch
- * out of every form.
- */
+export function formField(formData: FormData, name: string): string {
+  const value = formData.get(name);
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export function localOr(
   data: UserContext,
-  handleLocal: (formData: FormData) => void | Promise<void>
+  handleLocal: (formData: FormData) => unknown
 ): SubmitFunction {
   return ({ formData, cancel }) => {
     if (data.user?.kind === 'local') {
       cancel();
-      void handleLocal(formData);
+      handleLocal(formData);
       return;
     }
     return async ({ result }) => {

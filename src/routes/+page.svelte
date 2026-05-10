@@ -5,8 +5,10 @@
   import {
     computeDashboardStats,
     computeEnhancedStats,
+    distinctCategories,
     exportFilename,
     localOr,
+    matchesFilters,
     parseReceiptUrl,
     toCsv,
     toJson,
@@ -14,7 +16,6 @@
     useReceipts,
     type ExportFilters
   } from '$lib/receipts';
-  import type { ReceiptRecord } from '$lib/types';
   import { formatCurrency, formatMonthLabel, formatDateTime, formatPeriodLabel, slugCategory } from '$lib/utils/format';
   import type { ActionData, PageData } from './$types';
 
@@ -30,36 +31,10 @@
   let exportTo = $state('');
   let exportCategory = $state('');
   let exportLimit = $state('all');
-  let exportPreviewTotal = $state(0);
-  let exportPreviewLimited = $state(0);
-
   const store = useReceipts(() => data);
-  const isLocal = $derived(store.kind === 'local');
-  const records = $derived(store.records);
-
-  function matchesFilters(record: ReceiptRecord, filters: ExportFilters): boolean {
-    if (filters.month && record.urlDate.slice(0, 7) !== filters.month) return false;
-    if (filters.from && record.urlDate < filters.from) return false;
-    if (filters.to && record.urlDate > filters.to) return false;
-    if (filters.category) {
-      if (filters.category === '__unsorted__') {
-        if (record.category && record.category.trim() !== '') return false;
-      } else if (record.category !== filters.category) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  function distinctCategories(records: ReceiptRecord[]): string[] {
-    const seen = new Set<string>();
-    for (const record of records) {
-      seen.add(record.category && record.category.trim() !== '' ? record.category : 'Unsorted');
-    }
-    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }
 
   const view = $derived.by(() => {
+    const records = store.records;
     const ledgerFilters: ExportFilters = { month: data.month, category: data.category };
     const filtered = records.filter((record) => matchesFilters(record, ledgerFilters));
     return {
@@ -120,7 +95,7 @@
 
   function exportClient(format: 'csv' | 'json' | 'pdf', pdfMode: 'compact' | 'full' = 'compact'): void {
     const filters: ExportFilters = { ...buildExportFilters(), pdfMode };
-    const matching = records.filter((record) => matchesFilters(record, filters));
+    const matching = store.records.filter((record) => matchesFilters(record, filters));
     const limited = filters.limit ? matching.slice(0, filters.limit) : matching;
 
     if (format === 'csv') {
@@ -144,11 +119,18 @@
     return parts.length ? parts.join(' - ') : 'No page filters';
   }
 
+  const exportPreview = $derived.by(() => {
+    const filters = buildExportFilters();
+    const matching = store.records.filter((record) => matchesFilters(record, filters));
+    const limited = filters.limit ? Math.min(filters.limit, matching.length) : matching.length;
+    return { total: matching.length, limited };
+  });
+
   function previewLabel(): string {
-    if (exportPreviewTotal === exportPreviewLimited) {
-      return `${exportPreviewTotal} receipt${exportPreviewTotal === 1 ? '' : 's'} ready`;
+    if (exportPreview.total === exportPreview.limited) {
+      return `${exportPreview.total} receipt${exportPreview.total === 1 ? '' : 's'} ready`;
     }
-    return `${exportPreviewTotal} match, exporting ${exportPreviewLimited}`;
+    return `${exportPreview.total} match, exporting ${exportPreview.limited}`;
   }
 
   function useCustomScope() {
@@ -176,13 +158,6 @@
     exportTo = defaultToDate(data.month);
     exportCategory = data.category ?? '';
     exportLimit = 'all';
-  });
-
-  $effect(() => {
-    const filters = buildExportFilters();
-    const matching = records.filter((record) => matchesFilters(record, filters));
-    exportPreviewTotal = matching.length;
-    exportPreviewLimited = filters.limit ? Math.min(filters.limit, matching.length) : matching.length;
   });
 
   function handleScannerResult(value: string) {

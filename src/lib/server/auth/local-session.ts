@@ -1,6 +1,5 @@
 import type { Cookies } from '@sveltejs/kit';
-
-export const LOCAL_SESSION_COOKIE = 'local_session';
+import { LOCAL_SESSION_COOKIE } from '$lib/local-session';
 
 export function hasLocalSession(cookies: Cookies): boolean {
   return cookies.get(LOCAL_SESSION_COOKIE) === '1';

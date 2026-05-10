@@ -23,7 +23,9 @@ export {
   type ManualReceiptInput,
   type NewReceiptInput
 } from './ingest';
-export { localOr } from './forms';
+export { distinctCategories, matchesFilters } from './filters';
+export { formField, localOr } from './forms';
+export { parseReceiptRecord } from './record';
 export {
   useReceipt,
   useReceipts,

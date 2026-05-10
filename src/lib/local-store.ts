@@ -1,6 +1,6 @@
 import type { ParsedReceipt, ReceiptRecord } from '$lib/types';
 
-const STORAGE_KEY = 'receipts.records.v1';
+export const STORAGE_KEY = 'receipts.records.v1';
 
 type ReceiptMap = Record<string, ReceiptRecord>;
 
