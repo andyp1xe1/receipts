@@ -4,77 +4,54 @@ Receipt tracker for Moldova MEV receipts.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/andyp1xe1/receipts)
 
-## What it does
+## Two modes
 
-- imports a scanned MEV receipt URL
-- fetches and parses the receipt server-side
-- preserves the original `source_url`
-- stores canonical receipt identity in D1
-- lets you review receipts, categories, notes, and monthly totals
+- **Local**: receipts stay in your browser. No server, no account. Pick "Use locally on this device" on the login screen.
+- **Synced**: single-user account on Cloudflare D1 + Better Auth, with optional TOTP. Sign-up is gated by a one-time setup token; only one admin account can exist.
+
+Both share the same UI, importers, and exports.
+
+## Importing receipts
+
+- Paste or scan an MEV receipt URL: the server fetches and parses it, preserving the original `source_url`.
+- Or enter a receipt manually at `/receipts/new`.
+- Export filtered subsets to CSV, JSON, or PDF.
 
 ## Local development
 
 ```bash
 bun install
-export BETTER_AUTH_SECRET="replace-with-a-long-random-secret"
-export SETUP_TOKEN="replace-with-a-long-random-bootstrap-token"
-bun run db:generate
+cp .dev.vars.example .dev.vars   # then fill in BETTER_AUTH_SECRET and SETUP_TOKEN
 bun run db:migrate:local
-bun run check
-bun run test
 bun run dev
 ```
 
-Then open `/setup` once, enter the bootstrap token, and create the single admin account. After the first account exists, new signups are blocked and the app requires sign-in.
+Sync mode requires both vars. Local-only mode works without them.
 
 ## Deploy to Cloudflare
 
-- the repo is set up for a Deploy to Cloudflare button flow
-- Cloudflare provisions a fresh D1 database for each deployment and fills in the binding metadata during setup
-- provide `BETTER_AUTH_SECRET` and `SETUP_TOKEN` during deployment, or from a `.dev.vars` file for local development
-- after deploy, open `/setup`, enter the bootstrap token, and create the admin account
+Use the button above. Cloudflare provisions a fresh D1 for the deployment and fills in the binding.
 
-## Security model
+After deploy, set the two secrets from the Cloudflare dashboard under Workers → your worker → Settings → Variables and Secrets. Both are write-only — keep your own copy.
 
-- single-user by default; no public registration flow
-- password auth backed by Better Auth and D1
-- optional TOTP two-factor authentication with backup codes
-- all app pages, actions, and export routes require a session
+- `BETTER_AUTH_SECRET` — `openssl rand -base64 32`
+- `SETUP_TOKEN` — anything long and random
 
-## Auth configuration
+Then open `/setup`, enter the setup token, and create the admin account.
 
-- required secret: `BETTER_AUTH_SECRET`
-- required first-run bootstrap token: `SETUP_TOKEN`
-- optional public origin override: `BETTER_AUTH_URL`
-- on Cloudflare, store the secret with `wrangler secret put BETTER_AUTH_SECRET`
-- store the bootstrap token with `wrangler secret put SETUP_TOKEN`
-- for local development, exporting the variables in your shell or copying `.dev.vars.example` to `.dev.vars` is enough
+## Schema
 
-## Database workflow
-
-- Drizzle schema lives in `src/lib/server/db/schema.ts`
-- generate SQL into `migrations/` with `bun run db:generate`
-- apply local migrations with `bun run db:migrate:local`
-- apply remote migrations with `bun run db:migrate:remote`
-
-## Parser test corpora
-
-- The committed synthetic parser corpus lives in `src/lib/server/mev/synthetic-corpus.ts`
-- The normal suite uses that synthetic corpus with mocked fetch responses via `bun run test`
-- Concrete live MEV receipt URLs stay out of git and remain optional
-- Put a private live corpus in `tests/private/receipt_urls.json` or `tests/private/receipt_urls.local.json`
-- Or set `MEV_PRIVATE_RECEIPT_LIST=/absolute/path/to/receipt_urls.json`
-- Use `tests/receipt_urls.example.json` as the shape reference
-- Run only the live invariant suite with `bun run test:mev-live`
-
-## Production
-
-- app: `https://your-workers-app.workers.dev`
-- database binding and account config live in `wrangler.jsonc`
-- set `BETTER_AUTH_SECRET` and `SETUP_TOKEN` in your deployment environment before first boot
-
-Deploy with:
+Drizzle schema is in `src/lib/server/db/schema.ts`. After changing it:
 
 ```bash
-bun run deploy
+bun run db:generate         # writes SQL into migrations/
+bun run db:migrate:local    # or :remote
 ```
+
+## Tests
+
+```bash
+bun run test
+```
+
+Live MEV invariants stay out of git. Drop a private corpus at `tests/private/receipt_urls.json` (see `tests/receipt_urls.example.json` for the shape), or point `MEV_PRIVATE_RECEIPT_LIST` at one, then `bun run test:mev-live`.
