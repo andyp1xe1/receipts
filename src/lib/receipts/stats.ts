@@ -1,4 +1,5 @@
 import type { EnhancedStats, ReceiptRecord } from '$lib/types';
+import { slugCategory } from '$lib/utils/format';
 
 export interface DashboardStats {
   totalSpend: number;
@@ -8,10 +9,6 @@ export interface DashboardStats {
 }
 
 type Period = EnhancedStats['period'];
-
-function categoryOf(record: ReceiptRecord): string {
-  return record.category && record.category.trim() !== '' ? record.category : 'Unsorted';
-}
 
 function totalOf(record: ReceiptRecord): number {
   const parsed = Number(record.total);
@@ -46,7 +43,7 @@ export function computeDashboardStats(records: ReceiptRecord[]): DashboardStats 
     const amount = totalOf(record);
     totalSpend += amount;
 
-    const cat = categoryOf(record);
+    const cat = slugCategory(record.category);
     const catBucket = byCategory.get(cat) ?? emptyBucket();
     catBucket.total += amount;
     catBucket.count += 1;
@@ -92,7 +89,7 @@ export function computeEnhancedStats(
     total.count += 1;
     totals.set(key, total);
 
-    const cat = categoryOf(record);
+    const cat = slugCategory(record.category);
     const catKey = `${key}\u0000${cat}`;
     const existing = categoryTotals.get(catKey);
     if (existing) {

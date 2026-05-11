@@ -1,30 +1,39 @@
 import type { ParsedReceipt, ReceiptRecord } from '$lib/types';
 
-export const STORAGE_KEY = 'receipts.records.v1';
+const STORAGE_KEY = 'receipts.records.v1';
 
 type ReceiptMap = Record<string, ReceiptRecord>;
 
+let cache: ReceiptMap | null = null;
+const subscribers = new Set<() => void>();
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    cache = null;
+    for (const cb of subscribers) cb();
+  });
+}
+
 function read(): ReceiptMap {
+  if (cache !== null) return cache;
   if (typeof localStorage === 'undefined') return {};
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as ReceiptMap;
-  } catch {
-    return {};
+  if (!raw) {
+    cache = {};
+    return cache;
   }
+  try {
+    cache = JSON.parse(raw) as ReceiptMap;
+  } catch {
+    cache = {};
+  }
+  return cache;
 }
 
 function write(map: ReceiptMap): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-}
-
-function makeId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  cache = map;
+  if (typeof localStorage !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }
 
 function compareDesc(a: ReceiptRecord, b: ReceiptRecord): number {
@@ -61,7 +70,7 @@ export function findByCanonicalKey(receipt: ParsedReceipt): ReceiptRecord | null
 }
 
 export function create(receipt: ParsedReceipt, metadata: LocalReceiptMetadata): string {
-  const id = makeId();
+  const id = crypto.randomUUID();
   const timestamp = new Date().toISOString();
   const record: ReceiptRecord = {
     id,
@@ -104,4 +113,9 @@ export function remove(id: string): void {
   if (!(id in map)) return;
   delete map[id];
   write(map);
+}
+
+export function onChange(callback: () => void): () => void {
+  subscribers.add(callback);
+  return () => subscribers.delete(callback);
 }

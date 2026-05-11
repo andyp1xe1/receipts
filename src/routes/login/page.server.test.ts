@@ -34,15 +34,42 @@ describe('login page', () => {
   it('shows auth-unavailable hint from the query string', async () => {
     const result = await load({
       locals: {
+        authSecretConfigured: true,
         authTablesReady: true,
         authSetupComplete: true,
         session: null,
         user: null
       },
+      platform: { env: { DB: {} } },
       url: new URL('https://example.test/login?auth=unavailable')
     } as Parameters<typeof load>[0]);
 
-    expect(result).toEqual({ migrated: true, authUnavailable: true });
+    expect(result).toMatchObject({
+      hasRemoteBackend: true,
+      remoteReady: true,
+      authSecretConfigured: true,
+      authUnavailable: true
+    });
+  });
+
+  it('flags a missing auth secret', async () => {
+    const result = await load({
+      locals: {
+        authSecretConfigured: false,
+        authTablesReady: true,
+        authSetupComplete: true,
+        session: null,
+        user: null
+      },
+      platform: { env: { DB: {} } },
+      url: new URL('https://example.test/login')
+    } as Parameters<typeof load>[0]);
+
+    expect(result).toMatchObject({
+      hasRemoteBackend: true,
+      remoteReady: false,
+      authSecretConfigured: false
+    });
   });
 
   it('fails safely when auth tables are not ready', async () => {

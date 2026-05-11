@@ -1,5 +1,6 @@
 import type { ParsedReceipt } from '$lib/types';
 import { parseReceiptUrl, type ReceiptUrlMetadata } from './qr-url';
+import { MANUAL_ECC_ID } from './record';
 
 export interface ManualReceiptInput {
   merchantName: string;
@@ -48,9 +49,9 @@ export function synthesizeManual(input: ManualReceiptInput): ParsedReceipt {
     ...emptyReceipt(),
     merchant: { name: input.merchantName.trim(), taxId: '', address: '' },
     sourceUrl: '',
-    eccId: 'manual',
+    eccId: MANUAL_ECC_ID,
     urlTotal: total,
-    urlReceiptNumber: `manual-${Date.now()}`,
+    urlReceiptNumber: `${MANUAL_ECC_ID}-${Date.now()}`,
     urlDate: input.urlDate,
     total,
     issuedAt: `${input.urlDate}T00:00:00`

@@ -7,14 +7,20 @@ import { betterAuth } from 'better-auth';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { twoFactor } from 'better-auth/plugins/two-factor';
 import { AuthConfigurationError } from '$lib/server/auth/errors';
+import { hashPassword, verifyPassword } from '$lib/server/auth/password';
 import { countAuthUsers } from '$lib/server/auth/state';
 import { getDb } from '$lib/server/db/db';
 import { authSchema } from '$lib/server/db/schema';
 
 const textEncoder = new TextEncoder();
 
-function requireSecret(event: RequestEvent): string {
+export function getAuthSecret(event: RequestEvent): string | null {
   const secret = event.platform?.env.BETTER_AUTH_SECRET ?? privateEnv.BETTER_AUTH_SECRET;
+  return secret?.trim() ? secret : null;
+}
+
+function requireSecret(event: RequestEvent): string {
+  const secret = getAuthSecret(event);
   if (!secret) {
     throw new AuthConfigurationError('BETTER_AUTH_SECRET is required');
   }
@@ -58,7 +64,11 @@ export function createAuth(event: RequestEvent) {
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
-      minPasswordLength: 12
+      minPasswordLength: 12,
+      password: { hash: hashPassword, verify: verifyPassword }
+    },
+    session: {
+      cookieCache: { enabled: true, maxAge: 300 }
     },
     trustedOrigins: [event.url.origin],
     advanced: {

@@ -26,7 +26,11 @@
       <p class="auth-copy">Use it locally in your browser, or sign in to the synced account.</p>
     </div>
 
-    {#if data.authUnavailable}
+    {#if !data.authSecretConfigured && data.hasRemoteBackend}
+      <div class="alert error">
+        Set <code>BETTER_AUTH_SECRET</code> on the deployed worker, then refresh this page.
+      </div>
+    {:else if data.authUnavailable}
       <div class="alert error">Authentication is temporarily unavailable.</div>
     {/if}
 

@@ -1,5 +1,5 @@
 import { redirect, type Handle } from '@sveltejs/kit';
-import { createAuth } from '$lib/server/auth/auth';
+import { createAuth, getAuthSecret } from '$lib/server/auth/auth';
 import { authUnavailableMessage, isAuthConfigurationError } from '$lib/server/auth/errors';
 import { hasLocalSession } from '$lib/server/auth/local-session';
 import { authTablesReady, countAuthUsers } from '$lib/server/auth/state';
@@ -23,6 +23,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   const { pathname } = event.url;
   const hasRemoteBackend = !!event.platform?.env.DB;
 
+  event.locals.authSecretConfigured = !!getAuthSecret(event);
   event.locals.authTablesReady = await authTablesReady(event.platform);
   event.locals.authSetupComplete = event.locals.authTablesReady
     ? (await countAuthUsers(event.platform)) > 0
@@ -69,7 +70,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     throw redirect(303, '/login');
   }
 
-  if (event.locals.authTablesReady) {
+  if (event.locals.authTablesReady && event.locals.authSecretConfigured) {
     try {
       const session = await createAuth(event).api.getSession({
         headers: event.request.headers
@@ -86,7 +87,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         }
 
         if (!PUBLIC_PATHS.has(pathname)) {
-          throw redirect(303, '/login?auth=unavailable');
+          throw redirect(303, '/login');
         }
       } else {
         throw error;

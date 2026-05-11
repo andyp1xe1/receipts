@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
 import { AuthConfigurationError } from '$lib/server/auth/errors';
 
 vi.mock('$lib/server/auth/auth', () => ({
-  createAuth: vi.fn()
+  createAuth: vi.fn(),
+  getAuthSecret: vi.fn((event: RequestEvent) => event.platform?.env.BETTER_AUTH_SECRET || null)
 }));
 
 vi.mock('$lib/server/auth/state', () => ({
@@ -19,6 +20,7 @@ function makeEvent(pathname: string, method = 'GET'): RequestEvent {
   return {
     url: new URL(`https://example.test${pathname}`),
     request: new Request(`https://example.test${pathname}`, { method }),
+    cookies: { get: vi.fn(() => undefined) } as unknown as RequestEvent['cookies'],
     platform: {
       env: {
         DB: {} as D1Database,
@@ -31,6 +33,10 @@ function makeEvent(pathname: string, method = 'GET'): RequestEvent {
 }
 
 describe('auth protection handle', () => {
+  beforeEach(() => {
+    vi.mocked(createAuth).mockReset();
+  });
+
   it('redirects unauthenticated protected pages to login', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(1);
@@ -71,13 +77,16 @@ describe('auth protection handle', () => {
     expect(await response.text()).toBe('Unauthorized');
   });
 
-  it('redirects to setup when auth tables exist but no account is configured', async () => {
+  it('still redirects to login when no account exists (setup is opt-in)', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(0);
+    vi.mocked(createAuth).mockReturnValue({
+      api: { getSession: vi.fn().mockResolvedValue(null) }
+    } as never);
 
     await expect(
       handle({ event: makeEvent('/'), resolve: vi.fn() } as Parameters<typeof handle>[0])
-    ).rejects.toMatchObject({ status: 303, location: '/setup' });
+    ).rejects.toMatchObject({ status: 303, location: '/login' });
   });
 
   it('returns a safe 503 for auth api routes when auth config is missing', async () => {
@@ -96,31 +105,28 @@ describe('auth protection handle', () => {
     expect(await response.text()).toBe('Authentication is temporarily unavailable.');
   });
 
-  it('redirects protected pages to login with a safe auth-unavailable hint', async () => {
+  it('skips session validation and redirects protected pages to login when secret is missing', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(1);
-    vi.mocked(createAuth).mockReturnValue({
-      api: {
-        getSession: vi.fn().mockRejectedValue(new AuthConfigurationError('BETTER_AUTH_SECRET is required'))
-      }
-    } as never);
+
+    const event = makeEvent('/');
+    event.platform!.env.BETTER_AUTH_SECRET = '';
 
     await expect(
-      handle({ event: makeEvent('/'), resolve: vi.fn() } as Parameters<typeof handle>[0])
-    ).rejects.toMatchObject({ status: 303, location: '/login?auth=unavailable' });
+      handle({ event, resolve: vi.fn() } as Parameters<typeof handle>[0])
+    ).rejects.toMatchObject({ status: 303, location: '/login' });
+    expect(createAuth).not.toHaveBeenCalled();
   });
 
-  it('lets public login page render when auth is unavailable', async () => {
+  it('lets public login page render when the secret is missing', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(1);
-    vi.mocked(createAuth).mockReturnValue({
-      api: {
-        getSession: vi.fn().mockRejectedValue(new AuthConfigurationError('BETTER_AUTH_SECRET is required'))
-      }
-    } as never);
+
+    const event = makeEvent('/login');
+    event.platform!.env.BETTER_AUTH_SECRET = '';
 
     const response = await handle({
-      event: makeEvent('/login?auth=unavailable'),
+      event,
       resolve: vi.fn(async () => new Response('ok'))
     } as Parameters<typeof handle>[0]);
 

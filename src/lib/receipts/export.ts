@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ParsedReceipt, ReceiptRecord } from '$lib/types';
+import { slugCategory } from '$lib/utils/format';
 
 export interface ExportFilters {
   month?: string | null;
@@ -82,7 +83,7 @@ export function toCsv(records: ReceiptRecord[]): string {
         receipt.merchantTaxId || '',
         receipt.eccId,
         receipt.urlReceiptNumber,
-        receipt.category || 'Unsorted',
+        slugCategory(receipt.category),
         receipt.total,
         parsed.subtotal || '',
         parsed.payments.cashGiven?.toFixed(2) || '',
@@ -133,7 +134,7 @@ export function toJson(records: ReceiptRecord[], filters: ExportFilters): string
         eccId: r.eccId,
         total: r.total,
         subtotal: parsed.subtotal,
-        category: r.category || 'Unsorted',
+        category: slugCategory(r.category),
         note: r.note,
         issuedAt: r.issuedAt,
         printedNumber: parsed.printedNumber,
@@ -199,7 +200,7 @@ export function toPdf(records: ReceiptRecord[], filters: ExportFilters): ArrayBu
             receipt.urlDate,
             `${receipt.merchantName}${receipt.note ? `\n${receipt.note}` : ''}`,
             receipt.urlReceiptNumber,
-            receipt.category || 'Unsorted',
+            slugCategory(receipt.category),
             '',
             Number(receipt.total).toFixed(2)
           ],
@@ -243,7 +244,7 @@ export function toPdf(records: ReceiptRecord[], filters: ExportFilters): ArrayBu
         receipt.urlDate,
         receipt.merchantName,
         receipt.urlReceiptNumber,
-        receipt.category || 'Unsorted',
+        slugCategory(receipt.category),
         Number(receipt.total).toFixed(2)
       ]),
       headStyles,

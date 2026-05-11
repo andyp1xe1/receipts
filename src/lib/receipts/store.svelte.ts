@@ -1,6 +1,5 @@
 import { browser } from '$app/environment';
 import { invalidateAll } from '$app/navigation';
-import { STORAGE_KEY } from '$lib/local-store';
 import * as localStore from '$lib/local-store';
 import type { ReceiptRecord, ReceiptSummary } from '$lib/types';
 import { parseReceiptRecord } from './record';
@@ -14,6 +13,7 @@ interface ListContext extends UserContext {
 }
 
 interface DetailContext extends UserContext {
+  id: string;
   receipt?: ReceiptSummary | null;
 }
 
@@ -29,15 +29,6 @@ export interface ReceiptView {
   refresh(): void | Promise<void>;
 }
 
-function listenForLocalChanges(reload: () => void): () => void {
-  if (!browser) return () => {};
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === null || event.key === STORAGE_KEY) reload();
-  };
-  window.addEventListener('storage', onStorage);
-  return () => window.removeEventListener('storage', onStorage);
-}
-
 export function useReceipts(getData: () => ListContext): ReceiptsView {
   const kind = $derived(getData().user?.kind ?? 'remote');
   let local = $state<ReceiptRecord[]>([]);
@@ -45,7 +36,7 @@ export function useReceipts(getData: () => ListContext): ReceiptsView {
   $effect(() => {
     if (kind !== 'local' || !browser) return;
     local = localStore.list();
-    return listenForLocalChanges(() => {
+    return localStore.onChange(() => {
       local = localStore.list();
     });
   });
@@ -67,15 +58,15 @@ export function useReceipts(getData: () => ListContext): ReceiptsView {
   };
 }
 
-export function useReceipt(getData: () => DetailContext, getId: () => string): ReceiptView {
+export function useReceipt(getData: () => DetailContext): ReceiptView {
   const kind = $derived(getData().user?.kind ?? 'remote');
   let local = $state<ReceiptRecord | null>(null);
 
   $effect(() => {
     if (kind !== 'local' || !browser) return;
-    const id = getId();
+    const id = getData().id;
     local = localStore.get(id);
-    return listenForLocalChanges(() => {
+    return localStore.onChange(() => {
       local = localStore.get(id);
     });
   });
@@ -90,7 +81,7 @@ export function useReceipt(getData: () => DetailContext, getId: () => string): R
     },
     refresh() {
       if (kind === 'local') {
-        local = localStore.get(getId());
+        local = localStore.get(getData().id);
       } else {
         return invalidateAll();
       }
