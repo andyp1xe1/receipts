@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { synthesizeNewReceipt, parseReceiptUrl } from '$lib/receipts';
+import { requireRemoteUser } from '$lib/server/auth/guards';
 import { getExistingReceiptByCanonicalKey, insertReceipt } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
 
@@ -34,9 +35,9 @@ function readForm(formData: FormData) {
 
 export const actions: Actions = {
   save: async ({ locals, request, platform }) => {
-    if (locals.user?.kind === 'local') {
-      return fail(400, { type: 'error', message: 'Local mode saves in the browser.' });
-    }
+    const auth = requireRemoteUser(locals, 'Local mode saves in the browser.');
+    if (!auth.ok) return auth.failure;
+    const { userId } = auth;
 
     const formData = await request.formData();
     const input = readForm(formData);
@@ -51,12 +52,12 @@ export const actions: Actions = {
 
     const parsed = synthesizeNewReceipt(input);
 
-    const existing = await getExistingReceiptByCanonicalKey(platform, parsed);
+    const existing = await getExistingReceiptByCanonicalKey(platform, userId, parsed);
     if (existing) {
       throw redirect(303, `/receipts/${existing.id}?duplicate=1`);
     }
 
-    const id = await insertReceipt(platform, parsed, {
+    const id = await insertReceipt(platform, userId, parsed, {
       category: input.category,
       note: input.note
     });

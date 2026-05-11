@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createAuth } from '$lib/server/auth/auth';
+import { requireRemoteUser } from '$lib/server/auth/guards';
 import { clearLocalSession, hasLocalSession } from '$lib/server/auth/local-session';
 import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptsForExport } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
@@ -21,15 +22,19 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
     return { month, category, period, kind: 'local' as const, receipts: [] };
   }
 
-  const receipts = await listReceiptsForExport(platform, {});
+  if (locals.user?.kind !== 'remote') {
+    return { month, category, period, kind: 'remote' as const, receipts: [] };
+  }
+
+  const receipts = await listReceiptsForExport(platform, locals.user.id, {});
   return { month, category, period, kind: 'remote' as const, receipts };
 };
 
 export const actions: Actions = {
   ingest: async ({ locals, request, platform }) => {
-    if (locals.user?.kind === 'local') {
-      return fail(400, { type: 'error', message: 'Local mode handles imports in the browser.' });
-    }
+    const auth = requireRemoteUser(locals, 'Local mode handles imports in the browser.');
+    if (!auth.ok) return auth.failure;
+    const { userId } = auth;
     const formData = await request.formData();
     const sourceUrl = getFormString(formData, 'source_url').trim();
     const category = getFormString(formData, 'category').trim() || null;
@@ -53,11 +58,11 @@ export const actions: Actions = {
 
     try {
       const parsed = await fetchAndParseReceipt(normalizedSourceUrl);
-      const existing = await getExistingReceiptByCanonicalKey(platform, parsed);
+      const existing = await getExistingReceiptByCanonicalKey(platform, userId, parsed);
       if (existing) {
         destination = `/receipts/${existing.id}?duplicate=1`;
       } else {
-        const id = await insertReceipt(platform, parsed, { category, note });
+        const id = await insertReceipt(platform, userId, parsed, { category, note });
         destination = `/receipts/${id}?created=1`;
       }
     } catch (error) {

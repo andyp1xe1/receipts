@@ -9,7 +9,7 @@ vi.mock('$lib/server/db/receipts', () => ({
 import { actions, load } from './+page.server';
 import { deleteReceipt, getReceiptById, updateReceiptMetadata } from '$lib/server/db/receipts';
 
-const remoteLocals = { user: { kind: 'remote' as const } };
+const remoteLocals = { user: { kind: 'remote' as const, id: 'user_1' } };
 
 function makeSaveEvent(form: Record<string, string>) {
   const formData = new FormData();
@@ -64,7 +64,7 @@ describe('receipt detail page', () => {
       makeSaveEvent({ category: ' Fuel ', note: ' Note here ' })
     );
 
-    expect(updateReceiptMetadata).toHaveBeenCalledWith(undefined, {
+    expect(updateReceiptMetadata).toHaveBeenCalledWith(undefined, 'user_1', {
       id: 'r1',
       category: 'Fuel',
       note: 'Note here'
@@ -75,7 +75,7 @@ describe('receipt detail page', () => {
   it('normalizes empty metadata fields to null', async () => {
     await actions.save(makeSaveEvent({ category: '   ', note: '' }));
 
-    expect(updateReceiptMetadata).toHaveBeenCalledWith(undefined, {
+    expect(updateReceiptMetadata).toHaveBeenCalledWith(undefined, 'user_1', {
       id: 'r1',
       category: null,
       note: null

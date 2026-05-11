@@ -15,6 +15,17 @@ function isApiPath(pathname: string): boolean {
   return pathname.startsWith('/api/');
 }
 
+function isPublicApiPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/api/v1/') ||
+    pathname === '/api/v1' ||
+    pathname === '/api/docs' ||
+    pathname.startsWith('/api/docs/')
+  );
+}
+
+let setupCompleteCache = false;
+
 function isSettingsPath(pathname: string): boolean {
   return pathname.startsWith('/settings/');
 }
@@ -25,9 +36,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   event.locals.authSecretConfigured = !!getAuthSecret(event);
   event.locals.authTablesReady = await authTablesReady(event.platform);
-  event.locals.authSetupComplete = event.locals.authTablesReady
-    ? (await countAuthUsers(event.platform)) > 0
-    : false;
+  if (setupCompleteCache) {
+    event.locals.authSetupComplete = true;
+  } else if (event.locals.authTablesReady) {
+    setupCompleteCache = (await countAuthUsers(event.platform)) > 0;
+    event.locals.authSetupComplete = setupCompleteCache;
+  } else {
+    event.locals.authSetupComplete = false;
+  }
   event.locals.session = null;
   event.locals.user = null;
 
@@ -48,6 +64,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   if (isStaticPath(pathname)) {
+    return resolve(event);
+  }
+
+  if (isPublicApiPath(pathname)) {
     return resolve(event);
   }
 

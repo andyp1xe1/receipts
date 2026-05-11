@@ -1,37 +1,81 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { ParsedReceipt, ReceiptRecord, ReceiptSummary } from '$lib/types';
 import { getDb } from './db';
 import { receipts } from './schema';
 import {
   buildReceiptWhere,
   parseReceiptRecord,
+  parseReceiptRecords,
   type ReceiptFilters
 } from './shared';
 
+function scopeForUser(userId: string) {
+  return eq(receipts.userId, userId);
+}
+
+function scopedWhere(userId: string, filters: ReceiptFilters) {
+  const filterWhere = buildReceiptWhere(filters);
+  return filterWhere ? and(scopeForUser(userId), filterWhere) : scopeForUser(userId);
+}
+
 export async function listReceiptsForExport(
   platform: App.Platform | undefined,
+  userId: string,
   filters: ReceiptFilters = {},
   options: { limit?: number | null } = {}
 ): Promise<ReceiptRecord[]> {
   const baseQuery = getDb(platform)
     .select()
     .from(receipts)
-    .where(buildReceiptWhere(filters))
+    .where(scopedWhere(userId, filters))
     .orderBy(desc(receipts.urlDate), desc(receipts.createdAt));
 
   return typeof options.limit === 'number' ? await baseQuery.limit(options.limit).all() : await baseQuery.all();
 }
 
+export async function listReceiptsPaginated(
+  platform: App.Platform | undefined,
+  userId: string,
+  filters: ReceiptFilters,
+  page: { limit: number; skip: number }
+): Promise<{ items: ReceiptSummary[]; total: number }> {
+  const db = getDb(platform);
+  const where = scopedWhere(userId, filters);
+
+  const [rows, totalRow] = await Promise.all([
+    db
+      .select()
+      .from(receipts)
+      .where(where)
+      .orderBy(desc(receipts.urlDate), desc(receipts.createdAt))
+      .limit(page.limit)
+      .offset(page.skip)
+      .all(),
+    db.select({ value: sql<number>`count(*)` }).from(receipts).where(where).get()
+  ]);
+
+  return {
+    items: parseReceiptRecords(rows),
+    total: Number(totalRow?.value ?? 0)
+  };
+}
+
 export async function getReceiptById(
   platform: App.Platform | undefined,
+  userId: string,
   id: string
 ): Promise<ReceiptSummary | null> {
-  const result = await getDb(platform).select().from(receipts).where(eq(receipts.id, id)).get();
+  const result = await getDb(platform)
+    .select()
+    .from(receipts)
+    .where(and(eq(receipts.id, id), scopeForUser(userId)))
+    .get();
   return result ? parseReceiptRecord(result) : null;
 }
 
 export async function getExistingReceiptByCanonicalKey(
   platform: App.Platform | undefined,
+  userId: string,
   receipt: ParsedReceipt
 ): Promise<ReceiptSummary | null> {
   const result = await getDb(platform)
@@ -39,6 +83,7 @@ export async function getExistingReceiptByCanonicalKey(
     .from(receipts)
     .where(
       and(
+        scopeForUser(userId),
         eq(receipts.eccId, receipt.eccId),
         eq(receipts.urlTotal, receipt.urlTotal),
         eq(receipts.urlReceiptNumber, receipt.urlReceiptNumber),
@@ -52,6 +97,7 @@ export async function getExistingReceiptByCanonicalKey(
 
 export async function insertReceipt(
   platform: App.Platform | undefined,
+  userId: string,
   receipt: ParsedReceipt,
   metadata: { category: string | null; note: string | null }
 ): Promise<string> {
@@ -60,6 +106,7 @@ export async function insertReceipt(
 
   await getDb(platform).insert(receipts).values({
     id,
+    userId,
     sourceUrl: receipt.sourceUrl,
     eccId: receipt.eccId,
     urlTotal: receipt.urlTotal,
@@ -81,6 +128,7 @@ export async function insertReceipt(
 
 export async function updateReceiptMetadata(
   platform: App.Platform | undefined,
+  userId: string,
   input: { id: string; category: string | null; note: string | null }
 ): Promise<void> {
   await getDb(platform)
@@ -90,9 +138,13 @@ export async function updateReceiptMetadata(
       note: input.note,
       updatedAt: new Date().toISOString()
     })
-    .where(eq(receipts.id, input.id));
+    .where(and(eq(receipts.id, input.id), scopeForUser(userId)));
 }
 
-export async function deleteReceipt(platform: App.Platform | undefined, id: string): Promise<void> {
-  await getDb(platform).delete(receipts).where(eq(receipts.id, id));
+export async function deleteReceipt(
+  platform: App.Platform | undefined,
+  userId: string,
+  id: string
+): Promise<void> {
+  await getDb(platform).delete(receipts).where(and(eq(receipts.id, id), scopeForUser(userId)));
 }

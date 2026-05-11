@@ -102,6 +102,19 @@ export function createAuth(event: RequestEvent) {
         }
       }
     },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            const existingUsers = await countAuthUsers(event.platform);
+            if (existingUsers === 0) {
+              return { data: { ...user, role: 'ADMIN' } };
+            }
+            return { data: user };
+          }
+        }
+      }
+    },
     plugins: [twoFactor({ issuer: 'Receipt Ledger' }), sveltekitCookies(getRequestEvent)]
   });
 }

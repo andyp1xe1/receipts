@@ -5,6 +5,7 @@ export const receipts = sqliteTable(
   'receipts',
   {
     id: text('id').primaryKey(),
+    userId: text('user_id'),
     sourceUrl: text('source_url').notNull(),
     eccId: text('ecc_id').notNull(),
     urlTotal: text('url_total').notNull(),
@@ -22,11 +23,13 @@ export const receipts = sqliteTable(
   },
   (table) => [
     uniqueIndex('receipts_canonical_key_idx').on(
+      table.userId,
       table.eccId,
       table.urlTotal,
       table.urlReceiptNumber,
       table.urlDate
     ),
+    index('receipts_user_id_idx').on(table.userId),
     index('receipts_created_at_idx').on(table.createdAt),
     index('receipts_url_date_idx').on(table.urlDate),
     index('receipts_category_idx').on(table.category)
@@ -41,7 +44,11 @@ export const users = sqliteTable('user', {
   image: text('image'),
   createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updatedAt', { mode: 'timestamp_ms' }).notNull(),
-  twoFactorEnabled: integer('twoFactorEnabled', { mode: 'boolean' }).default(false)
+  twoFactorEnabled: integer('twoFactorEnabled', { mode: 'boolean' }).default(false),
+  role: text('role').notNull().default('USER'),
+  banned: integer('banned', { mode: 'boolean' }).default(false),
+  banReason: text('banReason'),
+  banExpires: integer('banExpires', { mode: 'timestamp_ms' })
 });
 
 export const sessions = sqliteTable(
