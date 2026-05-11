@@ -18,6 +18,7 @@ declare global {
     type AppUser = LocalUser | RemoteUser;
 
     interface Locals {
+      authSecretConfigured: boolean;
       authSetupComplete: boolean;
       authTablesReady: boolean;
       session: AuthSession['session'] | null;

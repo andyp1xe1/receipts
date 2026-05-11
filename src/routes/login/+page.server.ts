@@ -10,13 +10,18 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
   }
 
   const hasRemoteBackend = !!platform?.env.DB;
-  const remoteReady = hasRemoteBackend && locals.authTablesReady && locals.authSetupComplete;
+  const remoteReady =
+    hasRemoteBackend &&
+    locals.authTablesReady &&
+    locals.authSetupComplete &&
+    locals.authSecretConfigured;
 
   return {
     hasRemoteBackend,
     remoteReady,
     needsMigration: hasRemoteBackend && !locals.authTablesReady,
     needsAdmin: hasRemoteBackend && locals.authTablesReady && !locals.authSetupComplete,
+    authSecretConfigured: locals.authSecretConfigured,
     authUnavailable: url.searchParams.get('auth') === 'unavailable'
   };
 };

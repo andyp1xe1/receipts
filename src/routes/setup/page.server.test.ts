@@ -21,6 +21,7 @@ function makeEvent(form: Record<string, string>, locals?: Partial<App.Locals>) {
   return {
     request,
     locals: {
+      authSecretConfigured: true,
       authTablesReady: true,
       authSetupComplete: false,
       session: null,
@@ -45,6 +46,7 @@ describe('setup page', () => {
     const request = new Request('https://example.test/setup');
     const result = await load({
       locals: {
+        authSecretConfigured: true,
         authTablesReady: true,
         authSetupComplete: false,
         session: null,
@@ -57,6 +59,7 @@ describe('setup page', () => {
 
     expect(result).toEqual({
       setupTokenConfigured: true,
+      authSecretConfigured: true,
       migrated: true,
       migrateHint: true
     });

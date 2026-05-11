@@ -30,6 +30,8 @@
       <div class="alert error">
         Auth tables are missing. Run `bun run db:migrate:local` for local dev, then refresh this page.
       </div>
+    {:else if !data.authSecretConfigured}
+      <div class="alert error">Set `BETTER_AUTH_SECRET` on the worker before creating the first account.</div>
     {:else if !data.setupTokenConfigured}
       <div class="alert error">Set `SETUP_TOKEN` before creating the first admin account.</div>
     {:else if data.migrateHint}
@@ -61,7 +63,7 @@
         <input class="input" type="password" name="setup_token" autocomplete="one-time-code" required />
       </label>
 
-      <button class="button auth-submit" type="submit" disabled={!data.migrated || !data.setupTokenConfigured}>
+      <button class="button auth-submit" type="submit" disabled={!data.migrated || !data.setupTokenConfigured || !data.authSecretConfigured}>
         Create account
       </button>
     </form>

@@ -14,8 +14,13 @@ import { authSchema } from '$lib/server/db/schema';
 
 const textEncoder = new TextEncoder();
 
-function requireSecret(event: RequestEvent): string {
+export function getAuthSecret(event: RequestEvent): string | null {
   const secret = event.platform?.env.BETTER_AUTH_SECRET ?? privateEnv.BETTER_AUTH_SECRET;
+  return secret?.trim() ? secret : null;
+}
+
+function requireSecret(event: RequestEvent): string {
+  const secret = getAuthSecret(event);
   if (!secret) {
     throw new AuthConfigurationError('BETTER_AUTH_SECRET is required');
   }

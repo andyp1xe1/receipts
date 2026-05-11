@@ -16,6 +16,7 @@ export const load: PageServerLoad = async ({ locals, platform, request, url }) =
 
   return {
     setupTokenConfigured: Boolean(getSetupToken(eventLike)),
+    authSecretConfigured: locals.authSecretConfigured,
     migrated: locals.authTablesReady,
     migrateHint: url.searchParams.get('migrate') === '1'
   };
@@ -31,6 +32,12 @@ export const actions: Actions = {
 
     if (event.locals.authSetupComplete) {
       throw redirect(303, '/login');
+    }
+
+    if (!event.locals.authSecretConfigured) {
+      return fail(503, {
+        message: 'Set BETTER_AUTH_SECRET before creating the first account.'
+      });
     }
 
     const setupToken = getSetupToken(event);
