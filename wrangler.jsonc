@@ -1,7 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "receipts-app",
-  "account_id": "CLOUDFLARE_ACCOUNT_ID",
   "main": ".svelte-kit/cloudflare/_worker.js",
   "compatibility_date": "2026-03-22",
   "compatibility_flags": ["nodejs_compat"],
@@ -16,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "receipts-db",
-      "database_id": "D1_DATABASE_ID",
+      "database_id": "4e8e427f-b098-42d2-90d9-b26aa51bf3d2",
       "migrations_dir": "./migrations"
     }
   ]
