@@ -37,6 +37,10 @@ export const actions: Actions = {
     if (locals.user?.kind === 'local') {
       return fail(400, { type: 'error', message: 'Local mode saves in the browser.' });
     }
+    if (locals.user?.kind !== 'remote') {
+      return fail(401, { type: 'error', message: 'Sign in to add a receipt.' });
+    }
+    const userId = locals.user.id;
 
     const formData = await request.formData();
     const input = readForm(formData);
@@ -51,12 +55,12 @@ export const actions: Actions = {
 
     const parsed = synthesizeNewReceipt(input);
 
-    const existing = await getExistingReceiptByCanonicalKey(platform, parsed);
+    const existing = await getExistingReceiptByCanonicalKey(platform, userId, parsed);
     if (existing) {
       throw redirect(303, `/receipts/${existing.id}?duplicate=1`);
     }
 
-    const id = await insertReceipt(platform, parsed, {
+    const id = await insertReceipt(platform, userId, parsed, {
       category: input.category,
       note: input.note
     });

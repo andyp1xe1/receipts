@@ -47,6 +47,7 @@ export interface ParsedReceipt {
 
 export interface ReceiptRecord {
   id: string;
+  userId: string | null;
   sourceUrl: string;
   eccId: string;
   urlTotal: string;

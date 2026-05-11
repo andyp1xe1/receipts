@@ -21,7 +21,11 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
     return { month, category, period, kind: 'local' as const, receipts: [] };
   }
 
-  const receipts = await listReceiptsForExport(platform, {});
+  if (locals.user?.kind !== 'remote') {
+    return { month, category, period, kind: 'remote' as const, receipts: [] };
+  }
+
+  const receipts = await listReceiptsForExport(platform, locals.user.id, {});
   return { month, category, period, kind: 'remote' as const, receipts };
 };
 
@@ -30,6 +34,10 @@ export const actions: Actions = {
     if (locals.user?.kind === 'local') {
       return fail(400, { type: 'error', message: 'Local mode handles imports in the browser.' });
     }
+    if (locals.user?.kind !== 'remote') {
+      return fail(401, { type: 'error', message: 'Sign in to import a receipt.' });
+    }
+    const userId = locals.user.id;
     const formData = await request.formData();
     const sourceUrl = getFormString(formData, 'source_url').trim();
     const category = getFormString(formData, 'category').trim() || null;
@@ -53,11 +61,11 @@ export const actions: Actions = {
 
     try {
       const parsed = await fetchAndParseReceipt(normalizedSourceUrl);
-      const existing = await getExistingReceiptByCanonicalKey(platform, parsed);
+      const existing = await getExistingReceiptByCanonicalKey(platform, userId, parsed);
       if (existing) {
         destination = `/receipts/${existing.id}?duplicate=1`;
       } else {
-        const id = await insertReceipt(platform, parsed, { category, note });
+        const id = await insertReceipt(platform, userId, parsed, { category, note });
         destination = `/receipts/${id}?created=1`;
       }
     } catch (error) {

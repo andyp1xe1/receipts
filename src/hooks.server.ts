@@ -15,6 +15,15 @@ function isApiPath(pathname: string): boolean {
   return pathname.startsWith('/api/');
 }
 
+function isPublicApiPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/api/v1/') ||
+    pathname === '/api/v1' ||
+    pathname === '/api/docs' ||
+    pathname.startsWith('/api/docs/')
+  );
+}
+
 function isSettingsPath(pathname: string): boolean {
   return pathname.startsWith('/settings/');
 }
@@ -48,6 +57,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   if (isStaticPath(pathname)) {
+    return resolve(event);
+  }
+
+  if (isPublicApiPath(pathname)) {
     return resolve(event);
   }
 

@@ -8,6 +8,13 @@
       "when": 1774345079919,
       "tag": "0000_quick_warhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778491773592,
+      "tag": "0001_dazzling_masque",
+      "breakpoints": true
     }
   ]
 }

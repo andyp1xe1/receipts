@@ -74,6 +74,7 @@ export function create(receipt: ParsedReceipt, metadata: LocalReceiptMetadata): 
   const timestamp = new Date().toISOString();
   const record: ReceiptRecord = {
     id,
+    userId: null,
     sourceUrl: receipt.sourceUrl,
     eccId: receipt.eccId,
     urlTotal: receipt.urlTotal,

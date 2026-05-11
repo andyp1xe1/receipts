@@ -11,7 +11,11 @@ export const load: PageServerLoad = async ({ locals, params, platform, url }) =>
     return { id: params.id, receipt: null, created, duplicate };
   }
 
-  const receipt = await getReceiptById(platform, params.id);
+  if (locals.user?.kind !== 'remote') {
+    throw redirect(303, '/login');
+  }
+
+  const receipt = await getReceiptById(platform, locals.user.id, params.id);
   if (!receipt) {
     throw redirect(303, '/');
   }
@@ -24,12 +28,15 @@ export const actions: Actions = {
     if (locals.user?.kind === 'local') {
       return fail(400, { type: 'error', message: 'Local mode saves changes in the browser.' });
     }
+    if (locals.user?.kind !== 'remote') {
+      return fail(401, { type: 'error', message: 'Sign in to update receipts.' });
+    }
 
     const formData = await request.formData();
     const category = getFormString(formData, 'category').trim() || null;
     const note = getFormString(formData, 'note').trim() || null;
 
-    await updateReceiptMetadata(platform, {
+    await updateReceiptMetadata(platform, locals.user.id, {
       id: params.id,
       category,
       note
@@ -45,9 +52,12 @@ export const actions: Actions = {
     if (locals.user?.kind === 'local') {
       return fail(400, { type: 'error', message: 'Local mode deletes in the browser.' });
     }
+    if (locals.user?.kind !== 'remote') {
+      return fail(401, { type: 'error', message: 'Sign in to delete receipts.' });
+    }
 
     try {
-      await deleteReceipt(platform, params.id);
+      await deleteReceipt(platform, locals.user.id, params.id);
     } catch {
       return fail(400, {
         type: 'error',
