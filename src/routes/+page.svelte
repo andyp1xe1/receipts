@@ -3,6 +3,8 @@
   import { goto } from '$app/navigation';
   import AppHeader from '$lib/components/app-header.svelte';
   import QrScanner from '$lib/components/qr-scanner.svelte';
+  import Mascot from '$lib/icons/mascot.svelte';
+  import SearchIcon from '$lib/icons/search.svelte';
   import {
     computeDashboardStats,
     computeEnhancedStats,
@@ -226,15 +228,7 @@
 
     {#if store.records.length === 0}
       <section class="empty-hero">
-        <svg class="empty-art" viewBox="0 0 140 160" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M36 20 H104 V134 L96 126 L88 134 L80 126 L72 134 L64 126 L56 134 L48 126 L40 134 L36 126 Z" />
-          <path d="M46 40 H94" stroke-dasharray="2 4" opacity="0.7" />
-          <path d="M46 52 H88" stroke-dasharray="2 4" opacity="0.7" />
-          <path d="M46 64 H92" stroke-dasharray="2 4" opacity="0.7" />
-          <circle cx="58" cy="92" r="2" fill="currentColor" stroke="none" />
-          <circle cx="82" cy="92" r="2" fill="currentColor" stroke="none" />
-          <path d="M58 104 Q70 110 82 104" />
-        </svg>
+        <Mascot class="empty-art" />
         <h2 class="empty-hero-title">Your ledger is empty — and that's fine.</h2>
         <p class="empty-hero-copy">
           {#if data.user?.kind === 'local'}
@@ -441,11 +435,7 @@
               {/each}
             {:else}
               <div class="empty-state">
-                <svg class="empty-art empty-art-sm" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="34" cy="34" r="18" />
-                  <path d="M47 47 L62 62" />
-                  <path d="M28 34 H40" />
-                </svg>
+                <SearchIcon class="empty-art empty-art-sm" />
                 <div class="empty-state-title">Nothing matches these filters</div>
                 <div class="empty-state-copy">Try a different month or category, or clear the filters to see everything.</div>
               </div>
