@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { synthesizeNewReceipt, parseReceiptUrl } from '$lib/receipts';
+import { requireRemoteUser } from '$lib/server/auth/guards';
 import { getExistingReceiptByCanonicalKey, insertReceipt } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
 
@@ -34,13 +35,9 @@ function readForm(formData: FormData) {
 
 export const actions: Actions = {
   save: async ({ locals, request, platform }) => {
-    if (locals.user?.kind === 'local') {
-      return fail(400, { type: 'error', message: 'Local mode saves in the browser.' });
-    }
-    if (locals.user?.kind !== 'remote') {
-      return fail(401, { type: 'error', message: 'Sign in to add a receipt.' });
-    }
-    const userId = locals.user.id;
+    const auth = requireRemoteUser(locals, 'Local mode saves in the browser.');
+    if (!auth.ok) return auth.failure;
+    const { userId } = auth;
 
     const formData = await request.formData();
     const input = readForm(formData);

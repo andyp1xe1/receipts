@@ -1,32 +1,26 @@
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getAuthSecret } from '$lib/server/auth/auth';
-import { issueApiToken, isRole, type Role } from '$lib/server/api/jwt';
-
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' }
-  });
-}
+import { ADMIN_ROLE, TOKEN_TTL_SECONDS, issueApiToken } from '$lib/server/api/jwt';
 
 export const POST: RequestHandler = async (event) => {
   if (event.locals.user?.kind !== 'remote') {
-    return json(401, { error: 'Sign in required' });
+    return json({ error: 'Sign in required' }, { status: 401 });
   }
 
   const role = (event.locals.user as { role?: string }).role;
-  if (!isRole(role) || role !== 'ADMIN') {
-    return json(403, { error: 'Admin role required' });
+  if (role !== ADMIN_ROLE) {
+    return json({ error: 'Admin role required' }, { status: 403 });
   }
 
   const secret = getAuthSecret(event);
   if (!secret) {
-    return json(503, { error: 'Auth secret is not configured' });
+    return json({ error: 'Auth secret is not configured' }, { status: 503 });
   }
 
   const { token, payload } = await issueApiToken(secret, {
-    role: role as Role,
+    role: ADMIN_ROLE,
     subject: event.locals.user.id
   });
-  return json(200, { token, expiresIn: payload.exp - payload.iat, role: payload.role, sub: payload.sub });
+  return json({ token, expiresIn: TOKEN_TTL_SECONDS, role: payload.role, sub: payload.sub });
 };

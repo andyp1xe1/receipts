@@ -21,16 +21,35 @@
   let error = $state<string | null>(null);
   let busyId = $state<string | null>(null);
 
-  async function fetchToken(): Promise<string> {
+  let cachedToken: { token: string; expiresAt: number } | null = null;
+
+  async function getToken(force = false): Promise<string> {
+    const now = Date.now();
+    if (!force && cachedToken && cachedToken.expiresAt - now > 5_000) {
+      return cachedToken.token;
+    }
     const res = await fetch('/admin/token', { method: 'POST' });
     if (!res.ok) throw new Error('Could not mint an API token');
-    const body = (await res.json()) as { token: string };
+    const body = (await res.json()) as { token: string; expiresIn: number };
+    cachedToken = { token: body.token, expiresAt: now + body.expiresIn * 1000 };
     return body.token;
   }
 
   async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const token = await fetchToken();
-    const res = await fetch(path, {
+    let res = await call(await getToken(), path, init);
+    if (res.status === 401) {
+      res = await call(await getToken(true), path, init);
+    }
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Request failed (${res.status})`);
+    }
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  }
+
+  function call(token: string, path: string, init?: RequestInit): Promise<Response> {
+    return fetch(path, {
       ...init,
       headers: {
         ...(init?.headers ?? {}),
@@ -38,12 +57,6 @@
         'content-type': 'application/json'
       }
     });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `Request failed (${res.status})`);
-    }
-    if (res.status === 204) return undefined as T;
-    return (await res.json()) as T;
   }
 
   async function refresh() {

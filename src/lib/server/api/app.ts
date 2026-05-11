@@ -8,15 +8,16 @@ import {
   listReceiptsPaginated,
   updateReceiptMetadata
 } from '$lib/server/db/receipts';
-import { synthesizeNewReceipt } from '$lib/receipts';
 import { banUser, getUserById, listUsers, unbanUser } from '$lib/server/db/users';
 import { fetchAndParseReceipt } from '$lib/server/mev/mev';
 import { normalizeReceiptSource } from '$lib/utils/receipt-source';
 import {
+  ADMIN_ROLE,
+  ROLES,
+  TOKEN_TTL_SECONDS,
   issueApiToken,
   verifyApiToken,
-  type ApiTokenPayload,
-  TOKEN_TTL_SECONDS
+  type ApiTokenPayload
 } from './jwt';
 
 export type ApiBindings = {
@@ -30,7 +31,7 @@ export type ApiVariables = {
 
 type Env = { Bindings: ApiBindings; Variables: ApiVariables };
 
-const roleSchema = z.enum(['ADMIN', 'USER']);
+const roleSchema = z.enum(ROLES);
 
 const tokenResponseSchema = z.object({
   token: z.string(),
@@ -85,7 +86,7 @@ const requireJwt: MiddlewareHandler<Env> = async (c, next) => {
 
 const requireAdmin: MiddlewareHandler<Env> = async (c, next) => {
   const user = c.get('user');
-  if (user.role !== 'ADMIN') {
+  if (user.role !== ADMIN_ROLE) {
     return jsonError(c, 403, 'Admin role required');
   }
   await next();
@@ -137,15 +138,6 @@ const idParam = {
 
 const createReceiptBodySchema = z.object({
   sourceUrl: z.string().min(1),
-  category: z.string().nullable().optional(),
-  note: z.string().nullable().optional()
-});
-
-const createManualReceiptBodySchema = z.object({
-  merchantName: z.string().min(1),
-  total: z.string().min(1),
-  urlDate: z.string().min(1),
-  sourceUrl: z.string().optional(),
   category: z.string().nullable().optional(),
   note: z.string().nullable().optional()
 });
@@ -205,25 +197,6 @@ const createReceiptRoute = createRoute({
   request: {
     body: {
       content: { 'application/json': { schema: createReceiptBodySchema } }
-    }
-  },
-  responses: {
-    201: { content: { 'application/json': { schema: receiptSummarySchema } }, description: 'Created' },
-    400: { content: { 'application/json': { schema: errorSchema } }, description: 'Invalid request' },
-    401: { content: { 'application/json': { schema: errorSchema } }, description: 'Unauthorized' },
-    409: { content: { 'application/json': { schema: duplicateSchema } }, description: 'Duplicate receipt' }
-  }
-});
-
-const createManualReceiptRoute = createRoute({
-  method: 'post',
-  path: '/receipts/manual',
-  tags: ['Receipts'],
-  summary: 'Create a receipt from manually entered fields',
-  security: [{ bearerAuth: [] }],
-  request: {
-    body: {
-      content: { 'application/json': { schema: createManualReceiptBodySchema } }
     }
   },
   responses: {
@@ -410,28 +383,6 @@ export function createApiApp() {
       return c.json({ error: 'Receipt already imported', existingId: existing.id }, 409);
     }
 
-    const id = await insertReceipt(c.env.PLATFORM, user.sub, parsed, {
-      category: category ?? null,
-      note: note ?? null
-    });
-    const created = await getReceiptById(c.env.PLATFORM, user.sub, id);
-    if (!created) throw new Error('Receipt was inserted but could not be read back');
-    return c.json(created, 201);
-  });
-
-  app.openapi(createManualReceiptRoute, async (c) => {
-    const user = c.get('user');
-    const { merchantName, total, urlDate, sourceUrl, category, note } = c.req.valid('json');
-    const parsed = synthesizeNewReceipt({
-      merchantName,
-      total,
-      urlDate,
-      sourceUrl: sourceUrl?.trim() || undefined
-    });
-    const existing = await getExistingReceiptByCanonicalKey(c.env.PLATFORM, user.sub, parsed);
-    if (existing) {
-      return c.json({ error: 'Receipt already imported', existingId: existing.id }, 409);
-    }
     const id = await insertReceipt(c.env.PLATFORM, user.sub, parsed, {
       category: category ?? null,
       note: note ?? null

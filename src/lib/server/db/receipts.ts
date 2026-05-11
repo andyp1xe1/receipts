@@ -42,16 +42,17 @@ export async function listReceiptsPaginated(
   const db = getDb(platform);
   const where = scopedWhere(userId, filters);
 
-  const rows = await db
-    .select()
-    .from(receipts)
-    .where(where)
-    .orderBy(desc(receipts.urlDate), desc(receipts.createdAt))
-    .limit(page.limit)
-    .offset(page.skip)
-    .all();
-
-  const totalRow = await db.select({ value: sql<number>`count(*)` }).from(receipts).where(where).get();
+  const [rows, totalRow] = await Promise.all([
+    db
+      .select()
+      .from(receipts)
+      .where(where)
+      .orderBy(desc(receipts.urlDate), desc(receipts.createdAt))
+      .limit(page.limit)
+      .offset(page.skip)
+      .all(),
+    db.select({ value: sql<number>`count(*)` }).from(receipts).where(where).get()
+  ]);
 
   return {
     items: parseReceiptRecords(rows),

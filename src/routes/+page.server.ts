@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createAuth } from '$lib/server/auth/auth';
+import { requireRemoteUser } from '$lib/server/auth/guards';
 import { clearLocalSession, hasLocalSession } from '$lib/server/auth/local-session';
 import { getExistingReceiptByCanonicalKey, insertReceipt, listReceiptsForExport } from '$lib/server/db/receipts';
 import { getFormString } from '$lib/server/forms';
@@ -31,13 +32,9 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
 
 export const actions: Actions = {
   ingest: async ({ locals, request, platform }) => {
-    if (locals.user?.kind === 'local') {
-      return fail(400, { type: 'error', message: 'Local mode handles imports in the browser.' });
-    }
-    if (locals.user?.kind !== 'remote') {
-      return fail(401, { type: 'error', message: 'Sign in to import a receipt.' });
-    }
-    const userId = locals.user.id;
+    const auth = requireRemoteUser(locals, 'Local mode handles imports in the browser.');
+    if (!auth.ok) return auth.failure;
+    const { userId } = auth;
     const formData = await request.formData();
     const sourceUrl = getFormString(formData, 'source_url').trim();
     const category = getFormString(formData, 'category').trim() || null;

@@ -1,24 +1,18 @@
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createApiApp, type ApiBindings } from '$lib/server/api/app';
 import { getAuthSecret } from '$lib/server/auth/auth';
 
 const app = createApiApp();
 
-function jsonError(status: number, message: string): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { 'content-type': 'application/json' }
-  });
-}
-
 const handler: RequestHandler = (event) => {
   if (!event.platform?.env.DB) {
-    return jsonError(503, 'API requires the remote backend');
+    return json({ error: 'API requires the remote backend' }, { status: 503 });
   }
 
   const secret = getAuthSecret(event);
   if (!secret) {
-    return jsonError(503, 'API auth secret is not configured');
+    return json({ error: 'API auth secret is not configured' }, { status: 503 });
   }
 
   const env: ApiBindings = { SECRET: secret, PLATFORM: event.platform };

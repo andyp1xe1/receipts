@@ -31,15 +31,16 @@ export async function listUsers(
   page: { limit: number; skip: number }
 ): Promise<{ items: AdminUserRecord[]; total: number }> {
   const db = getDb(platform);
-  const rows = await db
-    .select()
-    .from(users)
-    .orderBy(desc(users.createdAt))
-    .limit(page.limit)
-    .offset(page.skip)
-    .all();
-
-  const totalRow = await db.select({ value: sql<number>`count(*)` }).from(users).get();
+  const [rows, totalRow] = await Promise.all([
+    db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt))
+      .limit(page.limit)
+      .offset(page.skip)
+      .all(),
+    db.select({ value: sql<number>`count(*)` }).from(users).get()
+  ]);
 
   return {
     items: rows.map(mapRow),
