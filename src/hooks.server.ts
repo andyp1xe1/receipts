@@ -4,7 +4,7 @@ import { authUnavailableMessage, isAuthConfigurationError } from '$lib/server/au
 import { hasLocalSession } from '$lib/server/auth/local-session';
 import { authTablesReady, countAuthUsers } from '$lib/server/auth/state';
 
-const PUBLIC_PATHS = new Set(['/login', '/setup', '/two-factor']);
+const PUBLIC_PATHS = new Set(['/about', '/login', '/setup', '/two-factor']);
 const REMOTE_ONLY_PATHS = new Set(['/setup', '/two-factor']);
 
 function isStaticPath(pathname: string): boolean {
@@ -66,8 +66,8 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   if (!hasRemoteBackend) {
-    if (pathname === '/login') return resolve(event);
-    throw redirect(303, '/login');
+    if (pathname === '/login' || pathname === '/about') return resolve(event);
+    throw redirect(303, '/about');
   }
 
   if (event.locals.authTablesReady && event.locals.authSecretConfigured) {
@@ -112,7 +112,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    throw redirect(303, '/login');
+    throw redirect(303, '/about');
   }
 
   return resolve(event);

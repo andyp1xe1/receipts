@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import ChevronLeft from '$lib/icons/chevron-left.svelte';
 
   type User = App.AppUser | null | undefined;
 
@@ -26,9 +27,7 @@
   <a class="app-brand" href="/" aria-label="Go to ledger">
     {#if back}
       <span class="back-chevron" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
+        <ChevronLeft />
       </span>
     {/if}
     <span class="app-title">{title}</span>

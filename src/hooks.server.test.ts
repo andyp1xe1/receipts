@@ -37,7 +37,7 @@ describe('auth protection handle', () => {
     vi.mocked(createAuth).mockReset();
   });
 
-  it('redirects unauthenticated protected pages to login', async () => {
+  it('redirects unauthenticated protected pages to the landing page', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(1);
     vi.mocked(createAuth).mockReturnValue({
@@ -46,10 +46,10 @@ describe('auth protection handle', () => {
 
     await expect(
       handle({ event: makeEvent('/'), resolve: vi.fn() } as Parameters<typeof handle>[0])
-    ).rejects.toMatchObject({ status: 303, location: '/login' });
+    ).rejects.toMatchObject({ status: 303, location: '/about' });
   });
 
-  it('redirects unauthenticated protected actions to login', async () => {
+  it('redirects unauthenticated protected actions to the landing page', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(1);
     vi.mocked(createAuth).mockReturnValue({
@@ -58,7 +58,7 @@ describe('auth protection handle', () => {
 
     await expect(
       handle({ event: makeEvent('/', 'POST'), resolve: vi.fn() } as Parameters<typeof handle>[0])
-    ).rejects.toMatchObject({ status: 303, location: '/login' });
+    ).rejects.toMatchObject({ status: 303, location: '/about' });
   });
 
   it('returns 401 for unauthenticated protected api routes', async () => {
@@ -77,7 +77,7 @@ describe('auth protection handle', () => {
     expect(await response.text()).toBe('Unauthorized');
   });
 
-  it('still redirects to login when no account exists (setup is opt-in)', async () => {
+  it('still redirects to the landing page when no account exists (setup is opt-in)', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(0);
     vi.mocked(createAuth).mockReturnValue({
@@ -86,7 +86,7 @@ describe('auth protection handle', () => {
 
     await expect(
       handle({ event: makeEvent('/'), resolve: vi.fn() } as Parameters<typeof handle>[0])
-    ).rejects.toMatchObject({ status: 303, location: '/login' });
+    ).rejects.toMatchObject({ status: 303, location: '/about' });
   });
 
   it('returns a safe 503 for auth api routes when auth config is missing', async () => {
@@ -105,7 +105,7 @@ describe('auth protection handle', () => {
     expect(await response.text()).toBe('Authentication is temporarily unavailable.');
   });
 
-  it('skips session validation and redirects protected pages to login when secret is missing', async () => {
+  it('skips session validation and redirects protected pages to the landing page when secret is missing', async () => {
     vi.mocked(authTablesReady).mockResolvedValue(true);
     vi.mocked(countAuthUsers).mockResolvedValue(1);
 
@@ -114,7 +114,7 @@ describe('auth protection handle', () => {
 
     await expect(
       handle({ event, resolve: vi.fn() } as Parameters<typeof handle>[0])
-    ).rejects.toMatchObject({ status: 303, location: '/login' });
+    ).rejects.toMatchObject({ status: 303, location: '/about' });
     expect(createAuth).not.toHaveBeenCalled();
   });
 
